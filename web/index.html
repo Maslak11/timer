@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>StageTimer — Conference Timer</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%;background:#0f0f0f;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+    .page{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:32px}
+    .logo{font-size:28px;font-weight:800;letter-spacing:-1px}
+    .logo span{color:#4caf50}
+    .tagline{font-size:15px;color:#999;margin-top:4px;text-align:center}
+    .card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:16px;padding:28px;width:100%;max-width:480px}
+    .card-title{font-size:15px;font-weight:600;margin-bottom:20px;color:#e8e8e8}
+    .form-group{margin-bottom:14px}
+    label{display:block;font-size:12px;color:#777;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:6px}
+    input,select{width:100%;padding:10px 14px;background:#252525;border:1px solid #333;border-radius:8px;color:#e8e8e8;font-size:14px;font-family:inherit;outline:none}
+    input:focus,select:focus{border-color:#4caf50}
+    select option{background:#252525}
+    .connect-btn{width:100%;padding:12px;background:#4caf50;color:#000;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;font-family:inherit;transition:opacity 0.15s}
+    .connect-btn:hover{opacity:0.88}
+    .views-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+    .view-btn{padding:10px;background:#252525;border:1px solid #333;border-radius:8px;color:#e8e8e8;font-size:13px;text-align:center;cursor:pointer;text-decoration:none;transition:background 0.15s;display:block}
+    .view-btn:hover{background:#333;border-color:#555}
+    .view-btn .icon{font-size:20px;display:block;margin-bottom:4px}
+    .divider{height:1px;background:#222;margin:20px 0}
+    .info{background:#111;border:1px solid #222;border-radius:10px;padding:16px;width:100%;max-width:480px;font-size:13px;color:#666;line-height:1.6}
+    .info a{color:#4caf50;text-decoration:none}
+    .companion{background:#111;border:1px solid #222;border-radius:10px;padding:16px;width:100%;max-width:480px}
+    .companion-title{font-size:13px;font-weight:600;color:#999;margin-bottom:10px}
+    .api-endpoint{font-family:monospace;font-size:12px;color:#4caf50;background:#1a1a1a;padding:4px 8px;border-radius:4px;display:inline-block;margin:2px 0}
+    footer{font-size:12px;color:#444;text-align:center;margin-top:8px}
+  </style>
+</head>
+<body>
+<div class="page">
+  <div style="text-align:center">
+    <div class="logo">⏱ Stage<span>Timer</span></div>
+    <div class="tagline">Conference speaker timer · Web panel</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Connect to Desktop App</div>
+    <div class="form-group">
+      <label>Desktop App IP Address</label>
+      <input type="text" id="ip-input" placeholder="192.168.1.100" value="">
+    </div>
+    <div class="form-group">
+      <label>Port</label>
+      <input type="text" id="port-input" placeholder="7000" value="7000">
+    </div>
+    <div class="form-group">
+      <label>Open View</label>
+      <select id="view-select">
+        <option value="viewer">Viewer — Large timer for audience screens</option>
+        <option value="operator">Operator — Timer + transport controls</option>
+        <option value="controller" selected>Controller — Full control panel</option>
+        <option value="moderator">Moderator — Timer + message control</option>
+        <option value="agenda">Agenda — Schedule overview</option>
+      </select>
+    </div>
+    <button class="connect-btn" onclick="connect()">Connect →</button>
+
+    <div class="divider"></div>
+    <div style="font-size:12px;color:#555;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Quick Access</div>
+    <div class="views-grid" id="quick-grid"></div>
+  </div>
+
+  <div class="info">
+    <strong style="color:#e8e8e8">How to connect:</strong><br>
+    1. Open the StageTimer desktop app on the operator PC<br>
+    2. Click <strong>Output Links</strong> in the toolbar<br>
+    3. Copy the IP address shown (or scan the QR code)<br>
+    4. Enter the IP above and click Connect<br><br>
+    All devices must be on the <strong>same Wi-Fi network</strong>.
+  </div>
+
+  <div class="companion">
+    <div class="companion-title">🎮 Bitfocus Companion API</div>
+    <div style="font-size:12px;color:#666;line-height:1.8">
+      Add a <strong style="color:#e8e8e8">Generic HTTP</strong> device in Companion pointing to:<br>
+      <div class="api-endpoint">http://[desktop-ip]:7001/api/status</div><br>
+      Key endpoints:<br>
+      <div class="api-endpoint">POST /api/timer/start</div>
+      <div class="api-endpoint">POST /api/timer/pause</div>
+      <div class="api-endpoint">POST /api/timer/next</div>
+      <div class="api-endpoint">POST /api/blackout?state=true</div>
+      <div class="api-endpoint">POST /api/timer/adjust?seconds=60</div>
+    </div>
+  </div>
+
+  <footer>StageTimer v1.0.0 · <a href="https://github.com/Maslak11/timer" style="color:#4caf50">GitHub</a></footer>
+</div>
+
+<script>
+const VIEWS=[
+  {id:'viewer',icon:'🖥',label:'Viewer'},
+  {id:'operator',icon:'🎮',label:'Operator'},
+  {id:'controller',icon:'🕹',label:'Controller'},
+  {id:'moderator',icon:'🎤',label:'Moderator'},
+  {id:'agenda',icon:'📋',label:'Agenda'}
+]
+
+// Restore last IP from localStorage
+const savedIP=localStorage.getItem('stagetimer-ip')
+if(savedIP)document.getElementById('ip-input').value=savedIP
+
+function getBase(){
+  const ip=document.getElementById('ip-input').value.trim()||'localhost'
+  const port=document.getElementById('port-input').value.trim()||'7000'
+  return `http://${ip}:${port}`
+}
+
+function connect(){
+  const ip=document.getElementById('ip-input').value.trim()
+  const view=document.getElementById('view-select').value
+  if(!ip){alert('Please enter the desktop app IP address');return}
+  localStorage.setItem('stagetimer-ip',ip)
+  window.open(getBase()+'/'+view,'_blank')
+}
+
+function buildQuickGrid(){
+  const grid=document.getElementById('quick-grid')
+  grid.innerHTML=VIEWS.map(v=>`
+    <a class="view-btn" href="#" onclick="openView('${v.id}');return false">
+      <span class="icon">${v.icon}</span>${v.label}
+    </a>`).join('')
+}
+
+function openView(view){
+  const ip=document.getElementById('ip-input').value.trim()
+  if(!ip){alert('Enter the desktop app IP first');return}
+  localStorage.setItem('stagetimer-ip',ip)
+  window.open(getBase()+'/'+view,'_blank')
+}
+
+buildQuickGrid()
+</script>
+</body>
+</html>

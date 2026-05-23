@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>StageTimer — Controller</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%;background:#0f0f0f;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;overflow:hidden;user-select:none}
+    .app{display:flex;flex-direction:column;height:100vh}
+    /* toolbar */
+    .toolbar{display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 14px;background:#1a1a1a;border-bottom:1px solid #222;flex-shrink:0}
+    .toolbar-logo{font-size:13px;font-weight:700;color:#e8e8e8}
+    .toolbar-right{display:flex;gap:6px}
+    .tb-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;font-family:inherit;background:#252525;color:#e8e8e8}
+    .tb-btn:hover{background:#333}
+    .tb-btn.danger{background:#e53935;color:#fff}
+    .tb-btn.flash-on{background:#4caf50;color:#000}
+    /* dashboard */
+    .dashboard{display:grid;grid-template-columns:1fr 260px;flex:1;overflow:hidden}
+    /* timer section */
+    .timer-section{display:flex;flex-direction:column;border-right:1px solid #222;overflow:hidden}
+    .section-header{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid #222;flex-shrink:0;gap:8px}
+    .section-title{font-size:13px;font-weight:600;color:#999}
+    .timer-list{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:5px}
+    .timer-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:#1a1a1a;border:1px solid #222;cursor:pointer}
+    .timer-card.active{background:#2a1212;border-color:#e53935}
+    .timer-card:hover{background:#222}
+    .t-num{font-size:11px;color:#555;width:16px;flex-shrink:0}
+    .t-sched{font-size:11px;color:#666;width:40px;flex-shrink:0}
+    .t-time{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;width:72px;flex-shrink:0}
+    .t-time.overtime{color:#e53935}
+    .t-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .t-controls{display:flex;gap:4px;flex-shrink:0}
+    .ic-btn{width:30px;height:30px;border-radius:6px;font-size:13px;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center}
+    .ic-btn-play{background:#333;color:#fff}
+    .ic-btn-play:hover{background:#4caf50;color:#000}
+    .ic-btn-play.live{background:#e53935}
+    .ic-btn-reset{background:#252525;color:#999}
+    .ic-btn-reset:hover{background:#333;color:#fff}
+    .t-prog{height:2px;background:#252525;margin:0 12px 8px;border-radius:1px;overflow:hidden}
+    .t-prog-fill{height:100%;background:#4caf50;transition:width 0.1s linear}
+    .timer-add{padding:8px;border-top:1px solid #222;flex-shrink:0}
+    .add-btn{width:100%;padding:8px;background:#1a1a1a;border:1px dashed #333;border-radius:8px;color:#555;font-size:13px;cursor:pointer;font-family:inherit}
+    .add-btn:hover{background:#222;color:#e8e8e8;border-color:#555}
+    /* transport */
+    .transport{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border-top:1px solid #222;flex-shrink:0}
+    .tr-btn{display:flex;align-items:center;justify-content:center;border-radius:7px;font-size:14px;border:none;cursor:pointer;font-family:inherit;background:#252525;color:#e8e8e8}
+    .tr-btn:hover{background:#333}
+    .tr-adj{width:auto;padding:0 14px;height:36px;font-size:12px}
+    .tr-nav{width:40px;height:40px}
+    .tr-main{width:52px;height:52px;font-size:20px;background:#333}
+    .tr-main:hover{background:#e53935}
+    /* message section */
+    .msg-section{display:flex;flex-direction:column;background:#111;overflow:hidden}
+    .msg-list{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:5px}
+    .msg-card{background:#1a1a1a;border:1px solid #222;border-radius:7px;overflow:hidden}
+    .msg-card.visible{border-color:#4caf50}
+    .msg-body{padding:8px 10px}
+    .msg-text-el{font-size:13px;line-height:1.4;min-height:18px;word-break:break-word}
+    .msg-footer{display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border-top:1px solid #222}
+    .msg-colors{display:flex;gap:3px}
+    .mc{width:12px;height:12px;border-radius:3px;border:2px solid transparent;cursor:pointer;flex-shrink:0}
+    .mc.sel{border-color:#fff}
+    .msg-show{padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:#252525;color:#e8e8e8}
+    .msg-show.on{background:#4caf50;color:#000}
+    .msg-add{padding:8px;border-top:1px solid #222;flex-shrink:0}
+    .status-bar{padding:5px 12px;border-top:1px solid #222;font-size:10px;color:#444;flex-shrink:0;display:flex;justify-content:space-between}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="toolbar">
+    <div class="toolbar-logo">⏱ StageTimer · Controller</div>
+    <div style="font-size:12px;color:#555" id="clock-toolbar">--:--:--</div>
+    <div class="toolbar-right">
+      <button class="tb-btn" id="blackout-btn" onclick="toggleBlackout()">● Blackout</button>
+      <button class="tb-btn" id="flash-btn" onclick="toggleFlash()">⚡ Flash</button>
+    </div>
+  </div>
+
+  <div class="dashboard">
+    <div class="timer-section">
+      <div class="section-header">
+        <span class="section-title">Timers</span>
+      </div>
+      <div class="timer-list" id="timer-list"></div>
+      <div class="timer-add">
+        <button class="add-btn" onclick="addTimer()">+ Add Timer</button>
+      </div>
+      <div class="transport">
+        <button class="tr-btn tr-adj" onclick="cmd('adjust',{seconds:-60})">-1m</button>
+        <button class="tr-btn tr-nav" onclick="cmd('prev')">⏮</button>
+        <button class="tr-btn tr-main" id="main-play" onclick="togglePlay()">▶</button>
+        <button class="tr-btn tr-nav" onclick="cmd('next')">⏭</button>
+        <button class="tr-btn tr-adj" onclick="cmd('adjust',{seconds:60})">+1m</button>
+      </div>
+    </div>
+
+    <div class="msg-section">
+      <div class="section-header">
+        <span class="section-title">Messages</span>
+      </div>
+      <div class="msg-list" id="msg-list"></div>
+      <div class="msg-add">
+        <button class="add-btn" onclick="addMessage()">+ Add Message</button>
+      </div>
+      <div class="status-bar">
+        <span id="status">Connecting...</span>
+        <span id="conn-count"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS={white:'#e8e8e8',orange:'#ff9800',red:'#e53935',green:'#4caf50',blue:'#2196f3',yellow:'#ffeb3b'}
+let state=null
+function cmd(a,d){if(window.sendCommand)window.sendCommand(a,d||{})}
+function fmt(sec){const abs=Math.abs(sec);const h=Math.floor(abs/3600),m=Math.floor((abs%3600)/60),s=Math.floor(abs%60);if(h>0)return h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')}
+function togglePlay(){if(!state)return;const t=state.timers[state.activeTimerIndex];if(!t)return;t.state==='running'?cmd('pause'):cmd('start')}
+function toggleBlackout(){if(state)cmd('blackout',{value:!state.blackout})}
+function toggleFlash(){if(state)cmd('flash',{value:!state.flash})}
+function addTimer(){const name=prompt('Timer name:','New Timer');if(!name)return;cmd('timer:add',{data:{name,duration:600,type:'countdown',color:'green'}})}
+function addMessage(){cmd('message:add',{data:{text:'New message',color:'white',bold:false}})}
+
+function render(s){
+  state=s
+  const now=new Date()
+  document.getElementById('clock-toolbar').textContent=now.toLocaleTimeString('en-GB',{timeZone:s.timezone,hour12:false})
+  document.getElementById('blackout-btn').className='tb-btn'+(s.blackout?' danger':'')
+  document.getElementById('flash-btn').className='tb-btn'+(s.flash?' flash-on':'')
+  const activeTimer=s.timers[s.activeTimerIndex]
+  document.getElementById('main-play').textContent=activeTimer?.state==='running'?'⏸':'▶'
+
+  let offset=0
+  const timerHTML=s.timers.map((t,i)=>{
+    const isActive=i===s.activeTimerIndex
+    const rem=t.type==='countdown'?t.duration-t.elapsed:t.elapsed
+    const ot=t.type==='countdown'&&t.elapsed>t.duration
+    const prog=t.duration>0?Math.min(t.elapsed/t.duration,1)*100:0
+    const barColor=ot||Math.abs(rem)<60?'#e53935':Math.abs(rem)<300?'#ff9800':'#4caf50'
+    const startT=new Date(now.getTime()+offset*1000)
+    const startStr=startT.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false})
+    offset+=t.duration
+    return `<div>
+      <div class="timer-card${isActive?' active':''}" onclick="cmd('start',{id:'${t.id}'})">
+        <div class="t-num">${i+1}</div>
+        <div class="t-sched">${startStr}</div>
+        <div class="t-time${ot?' overtime':''}">${(ot?'+':'')}${fmt(Math.abs(rem))}</div>
+        <div class="t-name">${t.name}</div>
+        <div class="t-controls">
+          <button class="ic-btn ic-btn-reset" onclick="event.stopPropagation();cmd('reset',{id:'${t.id}'})">⏮</button>
+          <button class="ic-btn ic-btn-play${t.state==='running'?' live':''}" onclick="event.stopPropagation();${t.state==='running'?`cmd('pause',{id:'${t.id}'})`:`cmd('start',{id:'${t.id}'})`}">${t.state==='running'?'⏸':'▶'}</button>
+        </div>
+      </div>
+      ${isActive?`<div class="t-prog"><div class="t-prog-fill" style="width:${prog}%;background:${barColor}"></div></div>`:''}
+    </div>`
+  }).join('')
+  document.getElementById('timer-list').innerHTML=timerHTML
+
+  const msgHTML=s.messages.map(m=>`
+    <div class="msg-card${m.visible?' visible':''}">
+      <div class="msg-body">
+        <div class="msg-text-el" style="color:${COLORS[m.color]||m.color};font-weight:${m.bold?700:400}">${m.text||'<span style="color:#444">Empty</span>'}</div>
+      </div>
+      <div class="msg-footer">
+        <div class="msg-colors">
+          ${Object.entries(COLORS).map(([c,hex])=>`<div class="mc${m.color===c?' sel':''}" style="background:${hex}" onclick="cmd('message:update',{id:'${m.id}',data:{color:'${c}'}})"></div>`).join('')}
+          <div class="mc" style="background:#333;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700;color:${m.bold?'#fff':'#555'}" onclick="cmd('message:update',{id:'${m.id}',data:{bold:${!m.bold}}})">B</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="msg-show${m.visible?' on':''}" onclick="cmd('${m.visible?'message:hide':'message:show'}',{id:'${m.id}'})">${m.visible?'Hide':'Show'}</button>
+          <button class="msg-show" onclick="if(confirm('Remove?'))cmd('message:remove',{id:'${m.id}'})">✕</button>
+        </div>
+      </div>
+    </div>`).join('')
+  document.getElementById('msg-list').innerHTML=msgHTML
+  document.getElementById('status').textContent='Connected'
+}
+setInterval(()=>{if(state)document.getElementById('clock-toolbar').textContent=new Date().toLocaleTimeString('en-GB',{timeZone:state.timezone||'UTC',hour12:false})},1000)
+</script>
+<script src="/shared/socket-client.js"></script>
+<script>window.onTimerState=render</script>
+</body>
+</html>

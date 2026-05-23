@@ -1,0 +1,69 @@
+{
+  "name": "stagetimer",
+  "version": "1.0.0",
+  "description": "Conference speaker timer with NDI output, web panel and Companion integration",
+  "main": "out/main/index.js",
+  "homepage": "https://timer.matlak.stream",
+  "author": "Jakub Matlak <jakub@matlak.stream>",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "npm run build && electron-builder",
+    "package:dir": "npm run build && electron-builder --dir",
+    "deploy:web": "node scripts/deploy-web.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
+    "uuid": "^9.0.1",
+    "qrcode": "^1.5.3",
+    "electron-updater": "^6.3.9",
+    "ftp-deploy": "^2.4.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^5.4.11"
+  },
+  "build": {
+    "appId": "stream.matlak.stagetimer",
+    "productName": "StageTimer",
+    "copyright": "Copyright © 2026 Jakub Matlak",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "win": {
+      "target": [{"target": "nsis", "arch": ["x64"]}],
+      "icon": "resources/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "StageTimer"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Maslak11",
+      "repo": "timer"
+    }
+  }
+}

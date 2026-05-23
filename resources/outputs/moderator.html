@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>StageTimer — Moderator</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%;background:#0f0f0f;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;overflow:hidden;user-select:none}
+    .layout{display:grid;grid-template-columns:1fr 280px;height:100vh;gap:0}
+    .left{display:flex;flex-direction:column;padding:16px;gap:10px;border-right:1px solid #222}
+    .right{display:flex;flex-direction:column;background:#111;overflow:hidden}
+    .header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .logo{font-size:12px;color:#555;font-weight:600}
+    .clock{font-size:13px;color:#999}
+    .timer-block{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1a1a1a;border-radius:10px;min-height:0}
+    .timer-label{font-size:13px;color:#999;margin-bottom:6px}
+    .timer-main{font-size:min(18vw,16vh);font-weight:800;letter-spacing:-2px;line-height:1;font-variant-numeric:tabular-nums}
+    .timer-main.overtime{color:#e53935}
+    .progress-bar{width:80%;height:5px;background:#252525;border-radius:3px;overflow:hidden;margin-top:10px}
+    .progress-fill{height:100%;background:#4caf50;transition:width 0.1s linear,background 0.3s}
+    .controls{display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0}
+    .btn{display:flex;align-items:center;justify-content:center;border-radius:7px;font-size:14px;cursor:pointer;border:none;font-family:inherit;transition:background 0.15s}
+    .btn-sm{background:#252525;color:#e8e8e8;width:36px;height:36px}
+    .btn-sm:hover{background:#333}
+    .btn-main{background:#333;color:#fff;width:48px;height:48px;font-size:18px}
+    .btn-main:hover{background:#e53935}
+    .btn-adj{background:#1a1a1a;color:#999;padding:0 12px;height:34px;font-size:12px;border-radius:6px;border:none;cursor:pointer}
+    .btn-adj:hover{background:#252525;color:#fff}
+    .msg-panel-header{padding:12px 14px;border-bottom:1px solid #222;font-size:12px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .msg-list{flex:1;overflow-y:auto;padding:8px}
+    .msg-card{background:#1a1a1a;border-radius:7px;border:1px solid #222;margin-bottom:6px;overflow:hidden}
+    .msg-card.active{border-color:#4caf50}
+    .msg-text{padding:10px 12px;font-size:13px;line-height:1.4;cursor:default}
+    .msg-actions{display:flex;border-top:1px solid #222}
+    .msg-btn{flex:1;padding:7px;text-align:center;font-size:12px;color:#999;cursor:pointer;border:none;background:none;font-family:inherit}
+    .msg-btn:hover{background:#252525;color:#e8e8e8}
+    .msg-btn.show-btn{color:#4caf50}
+    .msg-btn.show-btn:hover{background:#1a2a1a}
+    .status{padding:6px 12px;font-size:10px;color:#444;border-top:1px solid #222;flex-shrink:0}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <div class="left">
+    <div class="header">
+      <div class="logo">⏱ StageTimer · Moderator</div>
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+
+    <div class="timer-block">
+      <div class="timer-label" id="timer-name">—</div>
+      <div class="timer-main" id="main-time">--:--</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-adj" onclick="cmd('adjust',{seconds:-60})">-1m</button>
+      <button class="btn btn-sm" onclick="cmd('prev')">⏮</button>
+      <button class="btn btn-main" id="play-btn" onclick="togglePlay()">▶</button>
+      <button class="btn btn-sm" onclick="cmd('next')">⏭</button>
+      <button class="btn-adj" onclick="cmd('adjust',{seconds:60})">+1m</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="msg-panel-header">
+      <span>Messages</span>
+      <span id="msg-count">0</span>
+    </div>
+    <div class="msg-list" id="msg-list"></div>
+    <div class="status" id="status">Connecting...</div>
+  </div>
+</div>
+
+<script>
+let currentState=null
+const COLOR_MAP={white:'#e8e8e8',orange:'#ff9800',red:'#e53935',green:'#4caf50',blue:'#2196f3',yellow:'#ffeb3b'}
+function fmt(sec){const abs=Math.abs(sec);const h=Math.floor(abs/3600),m=Math.floor((abs%3600)/60),s=Math.floor(abs%60);if(h>0)return h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')}
+function cmd(action,data){if(window.sendCommand)window.sendCommand(action,data||{})}
+function togglePlay(){if(!currentState)return;const t=currentState.timers[currentState.activeTimerIndex];if(!t)return;t.state==='running'?cmd('pause'):cmd('start')}
+function render(state){
+  currentState=state
+  const timer=state.timers[state.activeTimerIndex]
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-GB',{timeZone:state.timezone,hour12:false})
+  if(timer){
+    const remaining=timer.type==='countdown'?timer.duration-timer.elapsed:timer.elapsed
+    const overtime=timer.type==='countdown'&&timer.elapsed>timer.duration
+    const progress=timer.duration>0?Math.min(timer.elapsed/timer.duration,1):0
+    const el=document.getElementById('main-time')
+    el.textContent=(overtime?'+':'')+fmt(Math.abs(remaining))
+    el.className='timer-main'+(overtime?' overtime':'')
+    const barColor=overtime||Math.abs(remaining)<60?'#e53935':Math.abs(remaining)<300?'#ff9800':'#4caf50'
+    const pf=document.getElementById('progress-fill')
+    pf.style.width=(progress*100)+'%';pf.style.background=barColor
+    document.getElementById('timer-name').textContent=timer.name
+    document.getElementById('play-btn').textContent=timer.state==='running'?'⏸':'▶'
+  }
+  const ml=document.getElementById('msg-list')
+  ml.innerHTML=state.messages.map(m=>`
+    <div class="msg-card${m.visible?' active':''}">
+      <div class="msg-text" style="color:${COLOR_MAP[m.color]||m.color};font-weight:${m.bold?700:400}">${m.text||'<span style="color:#555">Empty message</span>'}</div>
+      <div class="msg-actions">
+        <button class="msg-btn${m.visible?' show-btn':''}" onclick="cmd('${m.visible?'message:hide':'message:show'}',{id:'${m.id}'})">${m.visible?'Hide':'Show'}</button>
+      </div>
+    </div>`).join('')
+  document.getElementById('msg-count').textContent=state.messages.length
+  document.getElementById('status').textContent='Connected · '+new Date().toLocaleTimeString()
+}
+setInterval(()=>{if(currentState){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-GB',{timeZone:currentState.timezone||'UTC',hour12:false})}},1000)
+</script>
+<script src="/shared/socket-client.js"></script>
+<script>window.onTimerState=render</script>
+</body>
+</html>
