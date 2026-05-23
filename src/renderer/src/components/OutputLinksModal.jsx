@@ -1,56 +1,61 @@
 import React, { useState, useEffect } from 'react'
 
 const VIEWS = [
-  { id: 'viewer', label: 'Viewer', icon: '🖥' },
-  { id: 'operator', label: 'Operator', icon: '🎮' },
-  { id: 'controller', label: 'Controller', icon: '🕹' },
-  { id: 'agenda', label: 'Agenda', icon: '📋' },
-  { id: 'moderator', label: 'Moderator', icon: '🎤' }
+  { id: 'viewer',     label: 'Viewer',     icon: '🖥',  desc: 'Large timer for audience' },
+  { id: 'operator',   label: 'Operator',   icon: '🎮',  desc: 'Timer + transport controls' },
+  { id: 'controller', label: 'Controller', icon: '🕹',  desc: 'Full control panel' },
+  { id: 'agenda',     label: 'Agenda',     icon: '📋',  desc: 'Schedule overview' },
+  { id: 'moderator',  label: 'Moderator',  icon: '🎤',  desc: 'Timer + messages' }
 ]
 
-export default function OutputLinksModal({ onClose }) {
-  const [info, setInfo] = useState(null)
+export default function OutputLinksModal ({ onClose }) {
+  const [info, setInfo]         = useState(null)
   const [activeView, setActiveView] = useState('viewer')
-  const [copied, setCopied] = useState(false)
+  const [tab, setTab]           = useState('remote')  // 'remote' | 'local'
+  const [copied, setCopied]     = useState(false)
 
   useEffect(() => {
-    if (window.api) {
-      window.api.getServerInfo().then(setInfo)
-    }
+    if (window.api) window.api.getServerInfo().then(setInfo)
   }, [])
 
-  function getUrl(view) {
-    if (!info) return ''
-    return `http://${info.ip}:${info.port}/${view}`
-  }
+  const relay    = info?.relay
+  const roomId   = relay?.roomId ?? '——'
+  const relayBase = relay?.relayUrl ?? 'https://timer.matlak.stream'
 
-  function handleCopy() {
-    navigator.clipboard.writeText(getUrl(activeView))
+  const remoteUrl = relay ? `${relayBase}/?id=${relay.roomId}&view=${activeView}` : ''
+  const localUrl  = info  ? `http://${info.ip}:${info.port}/${activeView}` : ''
+  const activeUrl = tab === 'remote' ? remoteUrl : localUrl
+
+  function handleCopy () {
+    navigator.clipboard.writeText(activeUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  function handleOpen() {
-    const url = getUrl(activeView)
-    if (window.require) {
-      window.require('electron').shell.openExternal(url)
-    } else {
-      window.open(url, '_blank')
-    }
+  function handleOpen () {
+    if (!activeUrl) return
+    if (window.require) window.require('electron').shell.openExternal(activeUrl)
+    else window.open(activeUrl, '_blank')
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ minWidth: 640, maxWidth: 700 }} onClick={e => e.stopPropagation()}>
+      <div className="modal ol-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title">🖥 Output Links</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost btn-sm">+ Add Output ★</button>
-            <button className="btn btn-ghost btn-sm">···</button>
-            <button className="btn-icon" onClick={onClose}>✕</button>
+          <button className="btn-icon" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Room ID hero */}
+        <div className="room-id-hero">
+          <div className="room-id-label">Room ID</div>
+          <div className="room-id-value">{roomId}</div>
+          <div className="room-id-sub">
+            Wejdź na <strong style={{ color: 'var(--accent)' }}>timer.matlak.stream</strong> i wpisz ten kod
           </div>
         </div>
 
+        {/* View selector */}
         <div className="output-tabs">
           {VIEWS.map(v => (
             <button
@@ -58,80 +63,60 @@ export default function OutputLinksModal({ onClose }) {
               className={`output-tab ${activeView === v.id ? 'active' : ''}`}
               onClick={() => setActiveView(v.id)}
             >
-              <div className="output-tab-preview" />
-              <span>{v.label}</span>
+              <span style={{ fontSize: 18 }}>{v.icon}</span>
+              <span style={{ fontWeight: 600 }}>{v.label}</span>
             </button>
           ))}
         </div>
 
-        <div className="output-body">
-          <div className="output-preview-col">
-            <div className="output-preview-box">
-              <div style={{ fontSize: 48, fontWeight: 700, color: '#fff', textAlign: 'center', lineHeight: 1.2 }}>10:00</div>
-            </div>
-            <button className="btn btn-ghost btn-sm" style={{ marginTop: 8, width: '100%' }}>✏ Customize</button>
-          </div>
-
-          <div className="output-options-col">
-            <div className="form-group">
-              <label className="form-label">Logo</label>
-              <div className="btn-group">
-                <button className="btn btn-ghost btn-sm active-tab">Stagetimer</button>
-                <button className="btn btn-ghost btn-sm">Hidden</button>
-                <button className="btn btn-ghost btn-sm">Custom</button>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input placeholder="Enter password..." style={{ width: '100%' }} />
-            </div>
-
-            <div className="divider" />
-
-            <div className="form-group">
-              <label className="form-label">Identifier</label>
-              <input placeholder="Enter device name (optional)" style={{ width: '100%' }} />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Delay</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input defaultValue="0" style={{ width: 80 }} />
-                <span style={{ lineHeight: '32px', color: 'var(--text2)' }}>Seconds</span>
-              </div>
-            </div>
-          </div>
+        {/* Local / Remote tab switch */}
+        <div className="ol-tab-switch">
+          <button
+            className={`ol-tab ${tab === 'remote' ? 'active' : ''}`}
+            onClick={() => setTab('remote')}
+          >
+            🌐 Remote (timer.matlak.stream)
+          </button>
+          <button
+            className={`ol-tab ${tab === 'local' ? 'active' : ''}`}
+            onClick={() => setTab('local')}
+          >
+            🏠 Local network
+          </button>
         </div>
 
-        {info && (
-          <div className="output-footer">
-            <div className="output-qr">
-              {info.qr && <img src={info.qr} alt="QR" width={80} height={80} />}
-            </div>
-            <div className="output-url-bar">
-              <span className="output-url-text">{getUrl(activeView)}</span>
-              <button className="btn btn-ghost btn-sm" onClick={handleCopy}>
-                {copied ? '✓ Copied' : '📋 Copy'}
+        {/* QR + URL */}
+        <div className="ol-url-row">
+          {tab === 'remote' && info?.qr && (
+            <img src={info.qr} alt="QR" width={80} height={80} style={{ borderRadius: 8, flexShrink: 0 }} />
+          )}
+          <div className="ol-url-box">
+            <div className="ol-url-text">{activeUrl || '…'}</div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button className="btn btn-ghost btn-sm" onClick={handleCopy} style={{ flex: 1 }}>
+                {copied ? '✓ Skopiowano' : '📋 Kopiuj link'}
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={handleOpen}>
+                Otwórz ↗
               </button>
             </div>
-            <div className="output-actions">
-              <button className="btn btn-ghost btn-sm">QR &amp; Short Link</button>
-              <button className="btn btn-primary btn-sm" onClick={handleOpen}>Open Link ↗</button>
-            </div>
           </div>
-        )}
-
-        {!info && (
-          <div style={{ padding: 16, color: 'var(--text2)', textAlign: 'center' }}>
-            {window.api ? 'Loading server info...' : 'Running in browser mode — open output views directly'}
-          </div>
-        )}
-
-        <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg3)', borderRadius: 6, fontSize: 12, color: 'var(--text2)' }}>
-          💡 Scan the QR code or share the URL with devices on your network.
-          Companion API: <code style={{ color: 'var(--text)' }}>{info ? `http://${info.ip}:7001/api/status` : 'http://[ip]:7001/api/status'}</code>
         </div>
+
+        {tab === 'remote' && (
+          <div style={{ fontSize: 12, color: 'var(--text2)', padding: '8px 0', lineHeight: 1.5 }}>
+            ☁ Działa z każdego urządzenia — nie wymaga tej samej sieci.<br />
+            Companion API: <code style={{ color: 'var(--accent)', fontSize: 11 }}>POST https://timer.matlak.stream/api/command.php</code>
+            {' '}<code style={{ color: 'var(--text3)', fontSize: 11 }}>{`{"id":"${roomId}","action":"start"}`}</code>
+          </div>
+        )}
+
+        {tab === 'local' && (
+          <div style={{ fontSize: 12, color: 'var(--text2)', padding: '8px 0' }}>
+            🏠 Tylko dla urządzeń w tej samej sieci Wi-Fi.
+            {info && <span> Companion API: <code style={{ color: 'var(--accent)', fontSize: 11 }}>http://{info.ip}:7001/api/status</code></span>}
+          </div>
+        )}
       </div>
     </div>
   )

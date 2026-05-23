@@ -100,6 +100,7 @@ function render(state){
 }
 setInterval(()=>{if(currentState){const now=new Date();document.getElementById('clock').textContent=now.toLocaleTimeString('en-GB',{timeZone:currentState.timezone||'UTC',hour12:false})}},1000)
 </script>
+<script src="/shared/relay-client.js"></script>
 <script src="/shared/socket-client.js"></script>
 <script>window.onTimerState=render</script>
 </body>

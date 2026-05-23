@@ -348,6 +348,48 @@
 }
 
 /* ── Output Links Modal ── */
+.ol-modal { min-width: 520px; max-width: 580px; }
+
+.room-id-hero {
+  text-align: center;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.room-id-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text2); font-weight: 600; margin-bottom: 6px;
+}
+.room-id-value {
+  font-size: 42px; font-weight: 800; letter-spacing: 8px;
+  color: var(--accent); font-family: monospace; line-height: 1;
+}
+.room-id-sub { font-size: 12px; color: var(--text2); margin-top: 6px; }
+
+.ol-tab-switch {
+  display: flex; gap: 4px; margin-bottom: 12px;
+  background: var(--bg3); border-radius: 8px; padding: 3px;
+}
+.ol-tab {
+  flex: 1; padding: 7px; border-radius: 6px; font-size: 12px;
+  font-weight: 500; color: var(--text2); background: none;
+  cursor: pointer; border: none; font-family: inherit; transition: background .15s;
+}
+.ol-tab.active { background: var(--bg4); color: var(--text); }
+.ol-tab:hover:not(.active) { color: var(--text); }
+
+.ol-url-row {
+  display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px;
+}
+.ol-url-box { flex: 1; }
+.ol-url-text {
+  font-family: monospace; font-size: 12px; color: var(--accent);
+  background: var(--bg3); border-radius: 6px; padding: 8px 10px;
+  word-break: break-all; line-height: 1.4;
+}
+
 .output-tabs {
   display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto;
 }

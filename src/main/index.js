@@ -6,6 +6,7 @@ import { startCompanionApi } from './companion-api.js'
 import { initNDI, cleanup as cleanupNDI } from './ndi.js'
 import { registerIpcHandlers } from './ipc-handlers.js'
 import { setBroadcastFn } from './timer-engine.js'
+import { startRelay, stopRelay } from './relay.js'
 
 let mainWindow = null
 let tray = null
@@ -90,6 +91,7 @@ app.whenReady().then(async () => {
   loadState()
   startWebServer()
   startCompanionApi()
+  startRelay()
   initNDI()
   createWindow()
   createTray()
@@ -100,6 +102,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  stopRelay()
   cleanupNDI()
 })
 

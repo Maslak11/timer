@@ -3,6 +3,7 @@ import * as store from './timer-store.js'
 import * as engine from './timer-engine.js'
 import { getPort, addBroadcastListener, broadcastState } from './web-server.js'
 import { isNDIAvailable } from './ndi.js'
+import { getRelayInfo } from './relay.js'
 import os from 'os'
 import QRCode from 'qrcode'
 
@@ -39,9 +40,11 @@ export function registerIpcHandlers(mainWindow) {
   ipcMain.handle('get-server-info', async () => {
     const ip = getLocalIP()
     const port = getPort()
-    const url = `http://${ip}:${port}/viewer`
-    const qr = await QRCode.toDataURL(url, { width: 200, margin: 1 })
-    return { ip, port, url, qr, ndiAvailable: isNDIAvailable() }
+    const localUrl = `http://${ip}:${port}/viewer`
+    const relay = getRelayInfo()
+    const remoteUrl = `${relay.relayUrl}/?id=${relay.roomId}&view=viewer`
+    const qr = await QRCode.toDataURL(remoteUrl, { width: 200, margin: 1 })
+    return { ip, port, localUrl, qr, ndiAvailable: isNDIAvailable(), relay }
   })
 
   // Engine operations broadcast automatically via setBroadcastFn

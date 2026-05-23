@@ -180,6 +180,7 @@ function render(s){
 }
 setInterval(()=>{if(state)document.getElementById('clock-toolbar').textContent=new Date().toLocaleTimeString('en-GB',{timeZone:state.timezone||'UTC',hour12:false})},1000)
 </script>
+<script src="/shared/relay-client.js"></script>
 <script src="/shared/socket-client.js"></script>
 <script>window.onTimerState=render</script>
 </body>

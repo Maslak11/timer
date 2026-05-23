@@ -1,18 +1,23 @@
-// Shared Socket.io connection helper for all output views
-;(function() {
-  const SOCKET_PATH = window.SOCKET_URL || `http://${window.location.hostname}:7000`
+// Local WebSocket client — skipped in relay mode (?relay= param present)
+;(function () {
+  if (new URLSearchParams(location.search).get('relay')) return  // relay-client.js handles it
+
+  const host = window.location.hostname
+  const port = new URLSearchParams(location.search).get('port') || '7000'
+  const SOCKET_URL = `http://${host}:${port}`
+
   const script = document.createElement('script')
-  script.src = SOCKET_PATH + '/socket.io/socket.io.js'
-  script.onload = function() {
-    window.timerSocket = io(SOCKET_PATH)
-    window.timerSocket.on('connect', () => console.log('Connected to StageTimer'))
-    window.timerSocket.on('state', (state) => {
-      if (window.onTimerState) window.onTimerState(state)
-    })
-    // Send commands back
-    window.sendCommand = (action, data) => {
-      window.timerSocket.emit('command', { action, ...data })
-    }
+  script.src = SOCKET_URL + '/socket.io/socket.io.js'
+  script.onload = function () {
+    const sock = io(SOCKET_URL)
+    sock.on('connect',    ()      => { if (window.onConnect)    window.onConnect() })
+    sock.on('disconnect', ()      => { if (window.onDisconnect) window.onDisconnect() })
+    sock.on('state',      state   => { if (window.onTimerState) window.onTimerState(state) })
+
+    window.sendCommand = (action, data) => sock.emit('command', { action, ...(data || {}) })
+  }
+  script.onerror = function () {
+    console.warn('Could not load socket.io — desktop app may not be running on this host')
   }
   document.head.appendChild(script)
 })()

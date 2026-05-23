@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>StageTimer</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body,iframe{width:100%;height:100%;border:none;background:#000;overflow:hidden}
+    #loader{position:fixed;inset:0;background:#0f0f0f;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:999;font-family:-apple-system,sans-serif;color:#e8e8e8}
+    #loader .logo{font-size:22px;font-weight:800}
+    #loader .logo span{color:#4caf50}
+    #loader .sub{font-size:13px;color:#666}
+    #loader .dot{width:8px;height:8px;border-radius:50%;background:#4caf50;animation:pulse 1s infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+  </style>
+</head>
+<body>
+<div id="loader">
+  <div class="logo">⏱ Stage<span>Timer</span></div>
+  <div class="dot"></div>
+  <div class="sub" id="loader-msg">Connecting to room...</div>
+</div>
+<iframe id="frame" style="display:none"></iframe>
+
+<script>
+const params = new URLSearchParams(location.search)
+const ROOM_ID = (params.get('id') || '').toUpperCase()
+const VIEW    = params.get('view') || 'viewer'
+const BASE    = 'https://timer.matlak.stream'
+const VIEWS   = ['viewer','operator','controller','agenda','moderator']
+
+if (!ROOM_ID || !VIEWS.includes(VIEW)) {
+  document.getElementById('loader-msg').textContent = 'Invalid link — missing room ID or view'
+} else {
+  // Inject relay params into the output view iframe
+  document.title = `StageTimer · ${VIEW.charAt(0).toUpperCase()+VIEW.slice(1)}`
+  const frame = document.getElementById('frame')
+  frame.src = `${BASE}/outputs/${VIEW}.html?relay=${BASE}&id=${ROOM_ID}`
+  frame.onload = () => {
+    document.getElementById('loader').style.display = 'none'
+    frame.style.display = 'block'
+  }
+}
+</script>
+</body>
+</html>
