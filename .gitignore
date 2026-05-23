@@ -3,4 +3,5 @@ out/
 dist/
 .env
 *.local
+*.tmp.*
 web/outputs/
