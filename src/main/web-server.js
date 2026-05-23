@@ -79,6 +79,10 @@ function handleSocketCommand(cmd) {
 
 export function getPort() { return PORT }
 
+export function broadcastState() {
+  broadcastAll(getState())
+}
+
 export function stopWebServer() {
   if (httpServer) httpServer.close()
 }

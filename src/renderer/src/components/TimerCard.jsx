@@ -1,28 +1,40 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { formatCountdown, getTimerRemaining, isOvertime, getProgress } from '../utils/time.js'
 import TimerEditModal from './TimerEditModal.jsx'
 
 export default function TimerCard({ timer, index, isActive, state }) {
   const [editing, setEditing] = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
+  const [menuPos, setMenuPos] = useState(null)
+  const menuBtnRef = useRef(null)
 
   const remaining = getTimerRemaining(timer)
   const overtime = isOvertime(timer)
   const progress = getProgress(timer)
   const running = timer.state === 'running'
-  const paused = timer.state === 'paused'
 
-  // Calculate scheduled start time based on previous timers
   const scheduledStart = getScheduledTime(state, index)
 
-  function handleStart() { window.api.timerStart(timer.id) }
-  function handlePause() { window.api.timerPause(timer.id) }
-  function handleStop() { window.api.timerStop(timer.id) }
   function handleReset() { window.api.timerReset(timer.id) }
   function handleRemove() {
     if (confirm(`Remove timer "${timer.name}"?`)) window.api.timerRemove(timer.id)
-    setShowMenu(false)
+    setMenuPos(null)
   }
+
+  function openMenu(e) {
+    e.stopPropagation()
+    if (menuPos) { setMenuPos(null); return }
+    const rect = menuBtnRef.current.getBoundingClientRect()
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+  }
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuPos) return
+    const close = () => setMenuPos(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [menuPos])
 
   const barColor = overtime ? '#e53935'
     : remaining < 60 ? '#e53935'
@@ -59,20 +71,14 @@ export default function TimerCard({ timer, index, isActive, state }) {
             </button>
             <button
               className={`ctrl-btn ctrl-btn-play ${running ? 'active' : ''}`}
-              onClick={(e) => { e.stopPropagation(); running ? handlePause() : handleStart() }}
+              onClick={(e) => { e.stopPropagation(); running ? window.api.timerPause(timer.id) : window.api.timerStart(timer.id) }}
               title={running ? 'Pause' : 'Start'}
             >
               {running ? '⏸' : '▶'}
             </button>
-            <button className="ctrl-btn ctrl-btn-menu" onClick={(e) => { e.stopPropagation(); setShowMenu(v => !v) }}>
+            <button ref={menuBtnRef} className="ctrl-btn ctrl-btn-menu" onClick={openMenu}>
               ···
             </button>
-            {showMenu && (
-              <div className="timer-menu" onMouseLeave={() => setShowMenu(false)}>
-                <button onClick={(e) => { e.stopPropagation(); setEditing(true); setShowMenu(false) }}>Edit</button>
-                <button onClick={(e) => { e.stopPropagation(); handleRemove() }} className="danger">Remove</button>
-              </div>
-            )}
           </div>
         </div>
 
@@ -83,6 +89,18 @@ export default function TimerCard({ timer, index, isActive, state }) {
         )}
       </div>
 
+      {menuPos && createPortal(
+        <div
+          className="timer-menu-portal"
+          style={{ top: menuPos.top, right: menuPos.right }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button onClick={() => { setEditing(true); setMenuPos(null) }}>Edit</button>
+          <button onClick={handleRemove} className="danger">Remove</button>
+        </div>,
+        document.body
+      )}
+
       {editing && (
         <TimerEditModal timer={timer} onClose={() => setEditing(false)} />
       )}
@@ -91,12 +109,9 @@ export default function TimerCard({ timer, index, isActive, state }) {
 }
 
 function getScheduledTime(state, index) {
-  // Calculate when this timer would start if run sequentially
   const now = new Date()
   let offset = 0
-  for (let i = 0; i < index; i++) {
-    offset += state.timers[i].duration
-  }
+  for (let i = 0; i < index; i++) offset += state.timers[i].duration
   const t = new Date(now.getTime() + offset * 1000)
   return t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
