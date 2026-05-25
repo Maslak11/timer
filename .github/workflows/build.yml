@@ -33,12 +33,9 @@ jobs:
         run: node scripts/patch-grandiose.js
 
       - name: Rebuild grandiose for Electron
-        run: npx @electron/rebuild --module grandiose
+        run: npx @electron/rebuild --which-module grandiose
         env:
           GYP_MSVS_TOOLSET: v143
-
-      - name: Run remaining install scripts
-        run: npm rebuild --ignore-optional
 
       - name: Build
         run: npm run build
