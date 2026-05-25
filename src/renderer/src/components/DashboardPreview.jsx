@@ -111,7 +111,7 @@ export default function DashboardPreview({ state }) {
       <div className="connections-section">
         <div className="connections-header">
           <span>Live Connections</span>
-          <span className="connections-count">—</span>
+          <span className="connections-count">{state._connections ?? 0}</span>
         </div>
       </div>
     </div>

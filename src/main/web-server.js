@@ -10,9 +10,14 @@ const PORT = 7000
 let io = null
 let httpServer = null
 const broadcastListeners = []
+let connectionCount = 0
 
 export function addBroadcastListener(fn) {
   broadcastListeners.push(fn)
+}
+
+export function getConnectionCount() {
+  return connectionCount
 }
 
 function broadcastAll(state) {
@@ -44,8 +49,14 @@ export function startWebServer() {
   })
 
   io.on('connection', socket => {
+    connectionCount++
+    broadcastListeners.forEach(fn => fn({ ...getState(), _connections: connectionCount }))
     socket.emit('state', getState())
     socket.on('command', cmd => handleSocketCommand(cmd))
+    socket.on('disconnect', () => {
+      connectionCount--
+      broadcastListeners.forEach(fn => fn({ ...getState(), _connections: connectionCount }))
+    })
   })
 
   engine.setBroadcastFn(broadcastAll)

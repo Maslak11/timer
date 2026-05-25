@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import * as store from './timer-store.js'
 import * as engine from './timer-engine.js'
-import { getPort, addBroadcastListener, broadcastState } from './web-server.js'
+import { getPort, addBroadcastListener, broadcastState, getConnectionCount } from './web-server.js'
 import { isNDIAvailable } from './ndi.js'
 import { getRelayInfo } from './relay.js'
 import os from 'os'
@@ -22,7 +22,7 @@ let _forwardToRenderer = null
 export function registerIpcHandlers(mainWindow) {
   _forwardToRenderer = state => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('state', state)
+      mainWindow.webContents.send('state', { ...state, _connections: getConnectionCount() })
     }
   }
   // Engine broadcasts (timer tick, blackout, flash) reach renderer via this listener
