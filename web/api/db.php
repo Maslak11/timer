@@ -45,4 +45,14 @@ function init_tables() {
         executed TINYINT(1) DEFAULT 0,
         INDEX idx_room_exec (room_id, executed, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->exec("CREATE TABLE IF NOT EXISTS connections (
+        id VARCHAR(64) PRIMARY KEY,
+        room_id VARCHAR(8) NOT NULL,
+        view_name VARCHAR(32) DEFAULT 'unknown',
+        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        kicked TINYINT(1) DEFAULT 0,
+        INDEX idx_room (room_id),
+        INDEX idx_last_seen (last_seen)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }

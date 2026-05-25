@@ -111,8 +111,28 @@ export default function DashboardPreview({ state }) {
       <div className="connections-section">
         <div className="connections-header">
           <span>Live Connections</span>
-          <span className="connections-count">{state._connections ?? 0}</span>
+          <span className="connections-count">{(state._connections || []).length || 0}</span>
         </div>
+        {(state._connections || []).length > 0 && (
+          <div className="connections-list">
+            {(state._connections || []).map(c => (
+              <div key={c.id} className="conn-row">
+                <span className="conn-source" title={c.source === 'relay' ? 'Web (relay)' : 'Local network'}>
+                  {c.source === 'relay' ? '🌐' : '📡'}
+                </span>
+                <span className="conn-view">{c.view || 'unknown'}</span>
+                {c.connectedAt && (
+                  <span className="conn-time">{Math.floor((Date.now() - c.connectedAt) / 1000)}s</span>
+                )}
+                <button
+                  className="conn-kick"
+                  title="Kick connection"
+                  onClick={() => window.api.kickConnection(c.id, c.source)}
+                >✕</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -13,6 +13,7 @@ let roomId = null
 let secret = null
 let pushInterval = null
 let enabled = false
+let relayConnections = []
 
 function genId (len = 6) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -49,6 +50,10 @@ async function pushState () {
     const data = await res.json()
     if (data.commands?.length) {
       data.commands.forEach(cmd => handleRemoteCommand(cmd))
+    }
+    if (data.connections) {
+      relayConnections = data.connections
+      broadcastState()
     }
   } catch {}
 }
@@ -93,6 +98,20 @@ export function startRelay () {
 export function stopRelay () {
   enabled = false
   clearInterval(pushInterval)
+}
+
+export function getRelayConnections () { return relayConnections }
+
+export async function kickRelayClient (clientId) {
+  if (!roomId || !secret) return
+  try {
+    await fetch(`${RELAY_URL}/api/kick.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: roomId, secret, clientId }),
+      signal: AbortSignal.timeout(4000)
+    })
+  } catch {}
 }
 
 export function getRoomId ()   { return roomId }

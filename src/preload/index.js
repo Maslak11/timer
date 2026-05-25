@@ -29,5 +29,7 @@ contextBridge.exposeInMainWorld('api', {
   setBlackout: (val) => ipcRenderer.send('blackout', val),
   setFlash: (val) => ipcRenderer.send('flash', val),
 
-  roomUpdate: (data) => ipcRenderer.send('room:update', data)
+  roomUpdate: (data) => ipcRenderer.send('room:update', data),
+
+  kickConnection: (id, source) => ipcRenderer.send('connection:kick', { id, source })
 })

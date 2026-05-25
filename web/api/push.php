@@ -48,7 +48,18 @@ if ($rows) {
     $db->prepare("UPDATE commands SET executed = 1 WHERE id IN ($placeholders)")->execute($ids);
 }
 
+// Return active relay connections (seen in the last 5 seconds)
+$connQ = $db->prepare("SELECT id, view_name, last_seen FROM connections
+    WHERE room_id = ? AND last_seen > DATE_SUB(NOW(), INTERVAL 5 SECOND) AND kicked = 0");
+$connQ->execute([$id]);
+$activeConns = $connQ->fetchAll();
+
+// Clean up stale connections older than 15 seconds
+$db->prepare("DELETE FROM connections WHERE room_id = ? AND last_seen < DATE_SUB(NOW(), INTERVAL 15 SECOND)")
+   ->execute([$id]);
+
 echo json_encode([
-    'ok' => true,
-    'commands' => array_map(fn($r) => json_decode($r['command'], true), $rows)
+    'ok'          => true,
+    'commands'    => array_map(fn($r) => json_decode($r['command'], true), $rows),
+    'connections' => $activeConns
 ]);

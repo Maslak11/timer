@@ -5,7 +5,9 @@ require_once __DIR__ . '/db.php';
 cors();
 init_tables();
 
-$id = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $_GET['id'] ?? ''));
+$id   = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $_GET['id']   ?? ''));
+$cid  = preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['cid']  ?? '');
+$view = preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['view'] ?? 'unknown');
 if (!$id) { http_response_code(400); echo 'missing id'; exit; }
 
 header('Content-Type: text/event-stream');
@@ -25,6 +27,14 @@ function sse($event, $data) {
     flush();
 }
 
+// Register this connection in DB so the desktop app can see it
+if ($cid) {
+    $db->prepare("INSERT INTO connections (id, room_id, view_name) VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE room_id=VALUES(room_id), view_name=VALUES(view_name),
+        last_seen=CURRENT_TIMESTAMP, kicked=0")
+       ->execute([$cid, $id, $view]);
+}
+
 // Send initial state
 $row = $db->prepare("SELECT state, updated_at FROM rooms WHERE id = ?");
 $row->execute([$id]);
@@ -32,6 +42,7 @@ $room = $row->fetch();
 
 if (!$room) {
     sse('error', ['message' => 'Room not found']);
+    if ($cid) $db->prepare("DELETE FROM connections WHERE id=?")->execute([$cid]);
     exit;
 }
 
@@ -43,6 +54,20 @@ $deadline = time() + 55; // max 55s (server timeout safety)
 
 while (time() < $deadline && !connection_aborted()) {
     sleep(1);
+
+    // Heartbeat + kick check
+    if ($cid) {
+        $db->prepare("UPDATE connections SET last_seen=CURRENT_TIMESTAMP WHERE id=?")
+           ->execute([$cid]);
+        $kq = $db->prepare("SELECT kicked FROM connections WHERE id=?");
+        $kq->execute([$cid]);
+        $krow = $kq->fetch();
+        if ($krow && $krow['kicked']) {
+            sse('kick', []);
+            $db->prepare("DELETE FROM connections WHERE id=?")->execute([$cid]);
+            exit;
+        }
+    }
 
     $q = $db->prepare("SELECT state, updated_at FROM rooms WHERE id = ? AND updated_at > ?");
     $q->execute([$id, $lastUpdated]);
@@ -59,5 +84,6 @@ while (time() < $deadline && !connection_aborted()) {
     }
 }
 
-// Tell client to reconnect
+// Cleanup and tell client to reconnect
+if ($cid) $db->prepare("DELETE FROM connections WHERE id=?")->execute([$cid]);
 sse('reconnect', []);

@@ -6,13 +6,20 @@
   const port = new URLSearchParams(location.search).get('port') || '7000'
   const SOCKET_URL = `http://${host}:${port}`
 
+  // Detect view name from URL path: /viewer → "viewer"
+  const view = location.pathname.replace(/^\//, '').split('/').pop() || 'unknown'
+
   const script = document.createElement('script')
   script.src = SOCKET_URL + '/socket.io/socket.io.js'
   script.onload = function () {
     const sock = io(SOCKET_URL)
-    sock.on('connect',    ()      => { if (window.onConnect)    window.onConnect() })
-    sock.on('disconnect', ()      => { if (window.onDisconnect) window.onDisconnect() })
-    sock.on('state',      state   => { if (window.onTimerState) window.onTimerState(state) })
+    sock.on('connect', () => {
+      sock.emit('command', { action: 'register', view })
+      if (window.onConnect) window.onConnect()
+    })
+    sock.on('disconnect', () => { if (window.onDisconnect) window.onDisconnect() })
+    sock.on('state',  state => { if (window.onTimerState) window.onTimerState(state) })
+    sock.on('kick',   ()    => { sock.disconnect(); if (window.onDisconnect) window.onDisconnect('kicked') })
 
     window.sendCommand = (action, data) => sock.emit('command', { action, ...(data || {}) })
   }

@@ -10,14 +10,22 @@ const PORT = 7000
 let io = null
 let httpServer = null
 const broadcastListeners = []
-let connectionCount = 0
+const socketConnections = new Map() // socketId → { id, view, connectedAt }
 
 export function addBroadcastListener(fn) {
   broadcastListeners.push(fn)
 }
 
-export function getConnectionCount() {
-  return connectionCount
+export function getSocketConnections() {
+  return Array.from(socketConnections.values())
+}
+
+export function kickSocket(socketId) {
+  const sock = io?.sockets?.sockets?.get(socketId)
+  if (sock) {
+    sock.emit('kick')
+    sock.disconnect(true)
+  }
 }
 
 function broadcastAll(state) {
@@ -49,13 +57,24 @@ export function startWebServer() {
   })
 
   io.on('connection', socket => {
-    connectionCount++
-    broadcastListeners.forEach(fn => fn({ ...getState(), _connections: connectionCount }))
+    const conn = { id: socket.id, view: 'unknown', connectedAt: Date.now() }
+    socketConnections.set(socket.id, conn)
+    broadcastListeners.forEach(fn => fn(getState()))
+
     socket.emit('state', getState())
-    socket.on('command', cmd => handleSocketCommand(cmd))
+
+    socket.on('command', cmd => {
+      if (cmd.action === 'register') {
+        conn.view = cmd.view || 'unknown'
+        broadcastListeners.forEach(fn => fn(getState()))
+      } else {
+        handleSocketCommand(cmd)
+      }
+    })
+
     socket.on('disconnect', () => {
-      connectionCount--
-      broadcastListeners.forEach(fn => fn({ ...getState(), _connections: connectionCount }))
+      socketConnections.delete(socket.id)
+      broadcastListeners.forEach(fn => fn(getState()))
     })
   })
 

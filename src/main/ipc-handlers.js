@@ -1,9 +1,9 @@
 import { ipcMain } from 'electron'
 import * as store from './timer-store.js'
 import * as engine from './timer-engine.js'
-import { getPort, addBroadcastListener, broadcastState, getConnectionCount } from './web-server.js'
+import { getPort, addBroadcastListener, broadcastState, getSocketConnections, kickSocket } from './web-server.js'
 import { isNDIAvailable } from './ndi.js'
-import { getRelayInfo } from './relay.js'
+import { getRelayInfo, getRelayConnections, kickRelayClient } from './relay.js'
 import os from 'os'
 import QRCode from 'qrcode'
 
@@ -22,7 +22,11 @@ let _forwardToRenderer = null
 export function registerIpcHandlers(mainWindow) {
   _forwardToRenderer = state => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('state', { ...state, _connections: getConnectionCount() })
+      const local = getSocketConnections().map(c => ({ ...c, source: 'local' }))
+      const relay = getRelayConnections().map(c => ({
+        id: c.id, view: c.view_name || 'unknown', connectedAt: null, source: 'relay'
+      }))
+      mainWindow.webContents.send('state', { ...state, _connections: [...local, ...relay] })
     }
   }
   // Engine broadcasts (timer tick, blackout, flash) reach renderer via this listener
@@ -66,4 +70,9 @@ export function registerIpcHandlers(mainWindow) {
   ipcMain.on('message:update', (_, { id, data }) => { store.updateMessage(id, data);  storeBroadcast() })
   ipcMain.on('message:remove', (_, id)           => { store.removeMessage(id);        storeBroadcast() })
   ipcMain.on('room:update',    (_, data)         => { store.setState(data);           storeBroadcast() })
+
+  ipcMain.on('connection:kick', (_, { id, source }) => {
+    if (source === 'local') kickSocket(id)
+    else if (source === 'relay') kickRelayClient(id)
+  })
 }
