@@ -25,10 +25,51 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Package Windows installer
+      - name: Package Windows installer (unsigned)
         run: npm run package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signing handled by SignPath below — disable electron-builder auto-signing
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload unsigned installer artifact
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: StageTimer-unsigned
+          path: dist/*.exe
+          if-no-files-found: error
+
+      # ── SignPath code signing ─────────────────────────────────────────────
+      # Requires secrets: SIGNPATH_API_TOKEN, SIGNPATH_ORGANIZATION_ID
+      # Apply for free Open Source plan at: https://about.signpath.io/product/open-source
+      - name: Sign with SignPath
+        id: signpath
+        if: >
+          vars.SIGNPATH_ENABLED == 'true' &&
+          secrets.SIGNPATH_API_TOKEN != '' &&
+          secrets.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1.1
+        with:
+          api-token:                  '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id:            '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug:               'stagetimer'
+          signing-policy-slug:        'release-signing'
+          artifact-configuration-slug: 'windows-installer'
+          github-artifact-id:         '${{ steps.upload-unsigned.outputs.artifact-id }}'
+          wait-for-completion:        true
+          output-artifact-directory:  'dist-signed'
+        continue-on-error: true
+
+      - name: Use signed installer if available
+        shell: bash
+        run: |
+          if ls dist-signed/*.exe 2>/dev/null; then
+            echo "✅ Using signed installer"
+            cp dist-signed/*.exe dist/
+          else
+            echo "⚠️  SignPath not configured or signing failed — using unsigned installer"
+          fi
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

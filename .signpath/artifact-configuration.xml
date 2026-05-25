@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  SignPath artifact configuration for StageTimer Windows installer.
+  Uploaded to: https://app.signpath.io → Organization → Projects → stagetimer → Artifact Configurations
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <!-- Sign the NSIS installer .exe (Authenticode) -->
+  <pe-binary>
+    <authenticode-sign/>
+  </pe-binary>
+</artifact-configuration>
