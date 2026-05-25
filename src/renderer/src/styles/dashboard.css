@@ -60,6 +60,8 @@
 }
 .room-menu-add:hover, .room-menu-settings:hover { background: var(--bg3); }
 .room-menu-add { color: var(--green); font-weight: 600; }
+.room-add-form { padding: 4px 10px; }
+.room-add-form .room-rename-input { width: 100%; }
 
 /* Toolbar logo */
 .toolbar-logo { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }

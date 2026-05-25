@@ -22,34 +22,35 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      # ── NDI SDK — needed to compile @julusian/grandiose native module ────────
-      # The NDI runtime DLL (Processing.NDI.Lib.x64.dll) is already committed
-      # to resources/ndi/ and bundled next to the .exe via electron-builder
-      # extraFiles. This step only downloads the SDK dev headers/libs needed
-      # to compile the native Node.js addon for Electron 33.
-      # If the download fails the build continues — NDI button will show
-      # "brak SDK" but the rest of the app works normally.
-      - name: Download & install NDI 6 SDK (for grandiose native module)
-        id: ndi
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          $url = if ($env:NDI_SDK_URL) { $env:NDI_SDK_URL } `
-                 else { "https://downloads.ndi.tv/SDK/NDI_SDK/NDI%206%20SDK%20for%20Windows.exe" }
-          Write-Host "Downloading NDI 6 SDK from: $url"
-          Invoke-WebRequest -Uri $url -OutFile "ndi_installer.exe" -UseBasicParsing -TimeoutSec 180
-          Start-Process -Wait -FilePath ".\ndi_installer.exe" -ArgumentList "/S"
-          if (Test-Path "C:\Program Files\NDI\NDI 6 SDK") {
-            Write-Host "✅ NDI 6 SDK installed at: C:\Program Files\NDI\NDI 6 SDK"
-            "NDI_SDK_OK=true" | Out-File $env:GITHUB_ENV -Append
-          } else {
-            Write-Warning "NDI SDK not found after install — grandiose will not be compiled"
-          }
-        env:
-          NDI_SDK_URL: ${{ secrets.NDI_SDK_URL }}
+      - name: Install dependencies (skip native builds)
+        run: npm ci --ignore-scripts
 
-      - name: Install dependencies
-        run: npm ci
+      # ── grandiose v0.0.4 is self-contained (bundles its own NDI SDK headers
+      # and Processing.NDI.Lib.x64.lib / .dll). No external NDI SDK needed.
+      # We patch binding.gyp to disable MSVC strict-string mode (/Zc:strictStrings-)
+      # which would otherwise reject const-char* ↔ char* implicit conversions,
+      # then rebuild for the exact Electron ABI used by this project.
+      - name: Patch grandiose binding.gyp for MSVC compatibility
+        shell: pwsh
+        run: |
+          $gyp = "node_modules\grandiose\binding.gyp"
+          $content = Get-Content $gyp -Raw
+          # Insert msvs_settings block after "include_dirs" line
+          $patch = @'
+      "conditions": [["OS=='win'", {"msvs_settings": {"VCCLCompilerTool": {"AdditionalOptions": ["/Zc:strictStrings-"]}}}]],
+'@
+          $content = $content -replace '("include_dirs".*?\],)', "`$1`n      $patch"
+          Set-Content $gyp $content
+          Write-Host "✅ binding.gyp patched"
+
+      - name: Rebuild grandiose for Electron
+        shell: pwsh
+        run: npx @electron/rebuild --module grandiose
+        env:
+          GYP_MSVS_TOOLSET: v143
+
+      - name: Run remaining install scripts
+        run: npm rebuild --ignore-optional
 
       - name: Build
         run: npm run build
@@ -59,10 +60,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          # Point @julusian/grandiose binding.gyp to the NDI 6 SDK
-          # NDI_SDK_V5_DIR also set to NDI 6 path (API-compatible, covers older binding.gyp)
-          NDI_SDK_V5_DIR: C:\Program Files\NDI\NDI 6 SDK
-          NDI_SDK_V6_DIR: C:\Program Files\NDI\NDI 6 SDK
 
       - name: Upload unsigned installer artifact
         id: upload-unsigned

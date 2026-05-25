@@ -25,8 +25,6 @@ export default function App() {
         <TimerList state={state} />
         <MessagePanel state={state} />
       </div>
-      {/* Flash overlay — covers the entire window */}
-      <div className={`flash-overlay${state.flash ? ' on' : ''}`} />
     </div>
   )
 }

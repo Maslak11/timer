@@ -15,16 +15,16 @@
     "deploy:web": "node scripts/deploy-web.js"
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "express": "^4.19.2",
+    "ftp-deploy": "^2.4.7",
+    "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
-    "uuid": "^9.0.1",
-    "qrcode": "^1.5.3",
-    "electron-updater": "^6.3.9",
-    "ftp-deploy": "^2.4.7"
+    "uuid": "^9.0.1"
   },
   "optionalDependencies": {
-    "@julusian/grandiose": "^0.3.0"
+    "grandiose": "^0.0.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
@@ -46,6 +46,10 @@
       "out/**/*",
       "resources/**/*"
     ],
+    "asarUnpack": [
+      "**/grandiose/build/Release/*.node",
+      "**/grandiose/build/Release/*.dll"
+    ],
     "extraResources": [
       {
         "from": "resources",
@@ -56,11 +60,20 @@
       {
         "from": "resources/ndi",
         "to": ".",
-        "filter": ["*.dll"]
+        "filter": [
+          "*.dll"
+        ]
       }
     ],
     "win": {
-      "target": [{"target": "nsis", "arch": ["x64"]}],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "resources/icons/icon.ico"
     },
     "nsis": {

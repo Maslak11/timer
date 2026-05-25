@@ -8,7 +8,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/main/index.js') },
-        external: ['@julusian/grandiose']
+        external: ['grandiose']
       }
     }
   },

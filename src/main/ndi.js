@@ -21,7 +21,7 @@ export async function initNDI () {
     }
 
     // eslint-disable-next-line
-    const grandiose = require('@julusian/grandiose')
+    const grandiose = require('grandiose')
     const sender = await grandiose.send({
       name:        'StageTimer Output',
       clockVideo:  true,

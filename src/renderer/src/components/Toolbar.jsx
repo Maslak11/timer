@@ -11,6 +11,8 @@ export default function Toolbar({ state }) {
   const [activeRoomId,  setActiveRoomId] = useState(null)
   const [renaming,      setRenaming]     = useState(null)
   const [renameVal,     setRenameVal]    = useState('')
+  const [addingRoom,    setAddingRoom]   = useState(false)
+  const [newRoomName,   setNewRoomName]  = useState('')
   const [ndiStatus,     setNdiStatus]    = useState({ available: false, active: false })
 
   const roomMenuRef  = useRef(null)
@@ -73,13 +75,24 @@ export default function Toolbar({ state }) {
   }
 
   async function handleAddRoom() {
-    const name = prompt('Room name:', 'New Room')
-    if (!name) return
+    setAddingRoom(true)
+    setNewRoomName('New Room')
+  }
+
+  async function commitAddRoom() {
+    const name = newRoomName.trim() || 'New Room'
+    setAddingRoom(false)
+    setNewRoomName('')
     const room = await window.api.roomAdd(name)
     setRooms(r => [...r, room])
     await window.api.roomSwitch(room.id)
     setActiveRoomId(room.id)
     setShowRoomMenu(false)
+  }
+
+  function cancelAddRoom() {
+    setAddingRoom(false)
+    setNewRoomName('')
   }
 
   async function handleDeleteRoom(e, id) {
@@ -161,7 +174,25 @@ export default function Toolbar({ state }) {
                   </div>
                 ))}
                 <div className="room-menu-sep" />
-                <button className="room-menu-add" onClick={handleAddRoom}>+ New Room</button>
+                {addingRoom ? (
+                  <div className="room-add-form">
+                    <input
+                      className="room-rename-input"
+                      value={newRoomName}
+                      autoFocus
+                      placeholder="Room name"
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => setNewRoomName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter')  commitAddRoom()
+                        if (e.key === 'Escape') cancelAddRoom()
+                      }}
+                      onBlur={commitAddRoom}
+                    />
+                  </div>
+                ) : (
+                  <button className="room-menu-add" onClick={handleAddRoom}>+ New Room</button>
+                )}
                 <div className="room-menu-sep" />
                 <button className="room-menu-settings"
                   onClick={() => { setShowSettings(true); setShowRoomMenu(false) }}>
