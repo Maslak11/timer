@@ -25,26 +25,14 @@ jobs:
       - name: Install dependencies (skip native builds)
         run: npm ci --ignore-scripts
 
-      # ── grandiose v0.0.4 is self-contained (bundles its own NDI SDK headers
-      # and Processing.NDI.Lib.x64.lib / .dll). No external NDI SDK needed.
-      # We patch binding.gyp to disable MSVC strict-string mode (/Zc:strictStrings-)
-      # which would otherwise reject const-char* ↔ char* implicit conversions,
-      # then rebuild for the exact Electron ABI used by this project.
+      # grandiose v0.0.4 is self-contained — bundles its own NDI SDK headers,
+      # import lib, and runtime DLL. No external NDI SDK download needed.
+      # We patch binding.gyp (/Zc:strictStrings-) before rebuilding so MSVC
+      # accepts the const char* → char* calls in the old C++ source.
       - name: Patch grandiose binding.gyp for MSVC compatibility
-        shell: pwsh
-        run: |
-          $gyp = "node_modules\grandiose\binding.gyp"
-          $content = Get-Content $gyp -Raw
-          # Insert msvs_settings block after "include_dirs" line
-          $patch = @'
-      "conditions": [["OS=='win'", {"msvs_settings": {"VCCLCompilerTool": {"AdditionalOptions": ["/Zc:strictStrings-"]}}}]],
-'@
-          $content = $content -replace '("include_dirs".*?\],)', "`$1`n      $patch"
-          Set-Content $gyp $content
-          Write-Host "✅ binding.gyp patched"
+        run: node scripts/patch-grandiose.js
 
       - name: Rebuild grandiose for Electron
-        shell: pwsh
         run: npx @electron/rebuild --module grandiose
         env:
           GYP_MSVS_TOOLSET: v143
@@ -92,10 +80,10 @@ jobs:
         shell: bash
         run: |
           if ls dist-signed/*.exe 2>/dev/null; then
-            echo "✅ Using signed installer"
+            echo "Using signed installer"
             cp dist-signed/*.exe dist/
           else
-            echo "⚠️  SignPath not configured or signing failed — using unsigned installer"
+            echo "SignPath not configured or signing failed — using unsigned installer"
           fi
 
       - name: Upload installer artifact
