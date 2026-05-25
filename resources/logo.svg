@@ -1,12 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 90" fill="none">
-  <!-- Badge background -->
-  <rect x="3" y="3" width="120" height="72" rx="10" fill="#1b2636" stroke="#9aabb8" stroke-width="4"/>
-  <!-- M letter -->
-  <text x="14" y="63" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="56" fill="#9aabb8">M</text>
-  <!-- S letter -->
-  <text x="71" y="63" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="56" fill="#29b9e8">S</text>
-  <!-- matlak. text -->
-  <text x="134" y="42" font-family="Arial,sans-serif" font-weight="700" font-size="20" fill="#9aabb8">matlak.</text>
-  <!-- stream text -->
-  <text x="134" y="68" font-family="Arial,sans-serif" font-weight="700" font-size="20" fill="#29b9e8">stream</text>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 139 264" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(1,0,0,1,-1059.547508,-1864.107597)">
+        <g transform="matrix(15.314935,0,0,15.314935,-5745.37466,-5597.013044)">
+            <g transform="matrix(0.352933,0,0,0.352933,317.454768,421.874765)">
+                <path d="M374.865,188.5C374.855,192.244 374.83,195.185 374.916,195.408C374.974,195.559 375.335,196.493 376.457,196.718C377.557,196.94 382.798,196.407 383.718,197.228C384.025,197.502 384.614,197.891 384.402,201.492C384.265,203.83 381.966,203.558 381.502,203.566C379.146,203.605 375.824,203.332 375.316,204.371C374.574,205.89 375.066,212.864 374.933,218.503C374.814,223.572 374.918,226.504 381.489,226.277C384.217,226.184 384.401,226.75 384.811,229.446C384.915,230.127 385.149,230.803 385.108,231.49C385.036,232.715 383.602,233.152 383.417,233.209C380.929,233.967 371.15,234.906 367.525,230.48C364.45,226.726 365.276,221.874 365.202,206.502C365.2,206.069 365.283,204.852 364.781,204.279C363.387,202.688 359.847,204.763 359.564,201.494C359.211,197.431 360.309,197.076 360.664,196.961C361.962,196.542 365.508,197.694 365.801,194.54C365.94,193.052 365.945,186.093 367.444,185.405C368.259,185.031 373.541,184.722 374.375,185.614C374.645,185.903 374.762,186.349 374.78,186.419C374.822,186.58 374.786,186.573 374.865,188.5Z" style="fill:rgb(199,201,205);"/>
+            </g>
+        </g>
+    </g>
 </svg>
