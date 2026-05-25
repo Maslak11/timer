@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 90" fill="none">
+  <!-- Badge background -->
+  <rect x="3" y="3" width="120" height="72" rx="10" fill="#1b2636" stroke="#9aabb8" stroke-width="4"/>
+  <!-- M letter -->
+  <text x="14" y="63" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="56" fill="#9aabb8">M</text>
+  <!-- S letter -->
+  <text x="71" y="63" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="56" fill="#29b9e8">S</text>
+  <!-- matlak. text -->
+  <text x="134" y="42" font-family="Arial,sans-serif" font-weight="700" font-size="20" fill="#9aabb8">matlak.</text>
+  <!-- stream text -->
+  <text x="134" y="68" font-family="Arial,sans-serif" font-weight="700" font-size="20" fill="#29b9e8">stream</text>
+</svg>

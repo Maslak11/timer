@@ -143,6 +143,21 @@ export function setFlash(value) {
   broadcast()
 }
 
+// Stop the tick loop (used when switching rooms)
+export function stop() {
+  const state = getState()
+  state.timers.forEach(t => { t.state = 'stopped' })
+  clearInterval(tickInterval)
+  tickInterval = null
+  lastTick = null
+}
+
+// Start the tick loop (idempotent — used after room switch)
+export function start() {
+  // Nothing to do — tick loop starts automatically when a timer is started
+  broadcast()
+}
+
 export function cleanup() {
   clearInterval(tickInterval)
   tickInterval = null

@@ -26,15 +26,43 @@
 .room-icon { font-size: 14px; }
 .room-arrow { font-size: 10px; color: var(--text2); }
 .room-menu {
-  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  position: absolute; top: calc(100% + 6px); left: 0;
   background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 4px; min-width: 160px; z-index: 100;
+  border-radius: 8px; padding: 4px; min-width: 220px; z-index: 200;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
-.room-menu button {
+.room-menu-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+.room-menu-item:hover { background: var(--bg3); }
+.room-menu-item.active { background: rgba(76,175,80,0.08); }
+.room-item-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.room-item-name { flex: 1; font-weight: 500; color: var(--text); }
+.room-item-id { font-size: 10px; color: var(--text2); font-family: monospace; }
+.room-item-btn {
+  width: 20px; height: 20px; border-radius: 4px; border: none; cursor: pointer;
+  background: transparent; color: var(--text2); font-size: 11px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.room-item-btn:hover { background: var(--bg3); color: var(--text); }
+.room-item-del:hover { background: var(--red) !important; color: #fff !important; }
+.room-rename-input {
+  flex: 1; background: var(--bg3); border: 1px solid var(--accent);
+  border-radius: 4px; color: var(--text); font-size: 13px; padding: 2px 6px;
+  outline: none;
+}
+.room-menu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+.room-menu-add, .room-menu-settings {
   display: block; width: 100%; text-align: left;
-  padding: 8px 12px; border-radius: 5px; font-size: 13px; color: var(--text);
+  padding: 7px 10px; border-radius: 6px; font-size: 13px; color: var(--text);
+  background: transparent; border: none; cursor: pointer; font-family: inherit;
 }
-.room-menu button:hover { background: var(--bg3); }
+.room-menu-add:hover, .room-menu-settings:hover { background: var(--bg3); }
+.room-menu-add { color: var(--green); font-weight: 600; }
+
+/* Toolbar logo */
+.toolbar-logo { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 
 /* ── Dashboard layout ── */
 .dashboard {

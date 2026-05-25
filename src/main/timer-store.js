@@ -3,12 +3,24 @@ import { app } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 
-const DATA_FILE = join(app.getPath('userData'), 'room.json')
+const ROOMS_FILE = join(app.getPath('userData'), 'rooms.json')
+const LEGACY_FILE = join(app.getPath('userData'), 'room.json')
 
-function defaultRoom() {
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function genRelayId (len = 6) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let id = ''
+  for (let i = 0; i < len; i++) id += chars[Math.floor(Math.random() * chars.length)]
+  return id
+}
+
+function defaultRoom (name = 'Room 1') {
   return {
     id: uuidv4(),
-    name: 'Room 1',
+    name,
+    relayId: genRelayId(6),
+    relaySecret: genRelayId(32),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     overtime: 'continue',
     overtimePrefix: '+',
@@ -29,59 +41,116 @@ function defaultRoom() {
       }
     ],
     messages: [
-      { id: uuidv4(), text: 'Please wrap up', color: 'orange', visible: false, bold: false },
-      { id: uuidv4(), text: 'Questions', color: 'white', visible: false, bold: false },
+      { id: uuidv4(), text: 'Please wrap up',        color: 'orange', visible: false, bold: false },
+      { id: uuidv4(), text: 'Questions',              color: 'white',  visible: false, bold: false },
       { id: uuidv4(), text: 'Next speaker starting soon', color: 'red', visible: false, bold: true }
     ]
   }
 }
 
-let state = null
+// ── State ──────────────────────────────────────────────────────────────────
 
-export function loadState() {
-  if (existsSync(DATA_FILE)) {
-    try {
-      state = JSON.parse(readFileSync(DATA_FILE, 'utf-8'))
-      state.timers.forEach(t => { t.state = 'stopped'; t.elapsed = 0 })
-      state.blackout = false
-      state.flash = false
-    } catch {
-      state = defaultRoom()
-    }
-  } else {
-    state = defaultRoom()
-  }
-  return state
+let rooms = []       // array of room objects
+let activeId = null  // id of the currently active room
+
+function activeRoom () {
+  return rooms.find(r => r.id === activeId) || rooms[0]
 }
 
-export function saveState() {
+// ── Persistence ────────────────────────────────────────────────────────────
+
+export function loadState () {
+  // Migrate legacy single-room file
+  if (!existsSync(ROOMS_FILE) && existsSync(LEGACY_FILE)) {
+    try {
+      const legacy = JSON.parse(readFileSync(LEGACY_FILE, 'utf-8'))
+      // Assign relay credentials (migrated from relay.json if present)
+      const relayFile = join(app.getPath('userData'), 'relay.json')
+      let relayId = genRelayId(6)
+      let relaySecret = genRelayId(32)
+      if (existsSync(relayFile)) {
+        try {
+          const rc = JSON.parse(readFileSync(relayFile, 'utf-8'))
+          relayId = rc.roomId || relayId
+          relaySecret = rc.secret || relaySecret
+        } catch {}
+      }
+      legacy.relayId = relayId
+      legacy.relaySecret = relaySecret
+      if (!legacy.id) legacy.id = uuidv4()
+      if (!legacy.name) legacy.name = 'Room 1'
+      rooms = [legacy]
+      activeId = legacy.id
+      saveRooms()
+      return
+    } catch {}
+  }
+
+  if (existsSync(ROOMS_FILE)) {
+    try {
+      const data = JSON.parse(readFileSync(ROOMS_FILE, 'utf-8'))
+      rooms = data.rooms || []
+      activeId = data.activeId
+      if (!rooms.length) {
+        rooms = [defaultRoom()]
+        activeId = rooms[0].id
+      }
+      if (!rooms.find(r => r.id === activeId)) activeId = rooms[0].id
+    } catch {
+      rooms = [defaultRoom()]
+      activeId = rooms[0].id
+    }
+  } else {
+    rooms = [defaultRoom()]
+    activeId = rooms[0].id
+    saveRooms()
+  }
+
+  // Reset runtime state on load
+  const room = activeRoom()
+  room.timers.forEach(t => { t.state = 'stopped'; t.elapsed = 0 })
+  room.blackout = false
+  room.flash = false
+}
+
+function saveRooms () {
   try {
-    writeFileSync(DATA_FILE, JSON.stringify(state, null, 2))
+    writeFileSync(ROOMS_FILE, JSON.stringify({ activeId, rooms }, null, 2))
   } catch {}
 }
 
-export function getState() {
-  return state
+export function saveState () {
+  saveRooms()
 }
 
-export function setState(updater) {
+// ── Active room read/write ─────────────────────────────────────────────────
+
+export function getState () {
+  return activeRoom()
+}
+
+export function setState (updater) {
+  const room = activeRoom()
   if (typeof updater === 'function') {
-    updater(state)
+    updater(room)
   } else {
-    Object.assign(state, updater)
+    Object.assign(room, updater)
   }
-  saveState()
+  saveRooms()
 }
 
-export function getActiveTimer() {
-  return state.timers[state.activeTimerIndex] || null
+export function getActiveTimer () {
+  const room = activeRoom()
+  return room.timers[room.activeTimerIndex] || null
 }
 
-export function getTimerById(id) {
-  return state.timers.find(t => t.id === id) || null
+export function getTimerById (id) {
+  return activeRoom().timers.find(t => t.id === id) || null
 }
 
-export function addTimer(data) {
+// ── Timer CRUD ─────────────────────────────────────────────────────────────
+
+export function addTimer (data) {
   const timer = {
     id: uuidv4(),
     name: data.name || 'New Timer',
@@ -93,31 +162,34 @@ export function addTimer(data) {
     wrap: data.wrap || null,
     color: data.color || 'green'
   }
-  state.timers.push(timer)
-  saveState()
+  activeRoom().timers.push(timer)
+  saveRooms()
   return timer
 }
 
-export function updateTimer(id, data) {
+export function updateTimer (id, data) {
   const timer = getTimerById(id)
   if (!timer) return null
   Object.assign(timer, data)
-  saveState()
+  saveRooms()
   return timer
 }
 
-export function removeTimer(id) {
-  const idx = state.timers.findIndex(t => t.id === id)
+export function removeTimer (id) {
+  const room = activeRoom()
+  const idx = room.timers.findIndex(t => t.id === id)
   if (idx === -1) return false
-  state.timers.splice(idx, 1)
-  if (state.activeTimerIndex >= state.timers.length) {
-    state.activeTimerIndex = Math.max(0, state.timers.length - 1)
+  room.timers.splice(idx, 1)
+  if (room.activeTimerIndex >= room.timers.length) {
+    room.activeTimerIndex = Math.max(0, room.timers.length - 1)
   }
-  saveState()
+  saveRooms()
   return true
 }
 
-export function addMessage(data) {
+// ── Message CRUD ───────────────────────────────────────────────────────────
+
+export function addMessage (data) {
   const msg = {
     id: uuidv4(),
     text: data.text || '',
@@ -125,23 +197,74 @@ export function addMessage(data) {
     visible: false,
     bold: data.bold || false
   }
-  state.messages.push(msg)
-  saveState()
+  activeRoom().messages.push(msg)
+  saveRooms()
   return msg
 }
 
-export function updateMessage(id, data) {
-  const msg = state.messages.find(m => m.id === id)
+export function updateMessage (id, data) {
+  const msg = activeRoom().messages.find(m => m.id === id)
   if (!msg) return null
   Object.assign(msg, data)
-  saveState()
+  saveRooms()
   return msg
 }
 
-export function removeMessage(id) {
-  const idx = state.messages.findIndex(m => m.id === id)
+export function removeMessage (id) {
+  const room = activeRoom()
+  const idx = room.messages.findIndex(m => m.id === id)
   if (idx === -1) return false
-  state.messages.splice(idx, 1)
-  saveState()
+  room.messages.splice(idx, 1)
+  saveRooms()
+  return true
+}
+
+// ── Room management ────────────────────────────────────────────────────────
+
+export function getRoomsList () {
+  return rooms.map(r => ({ id: r.id, name: r.name, relayId: r.relayId }))
+}
+
+export function getActiveRoomId () {
+  return activeId
+}
+
+export function addRoom (name = 'New Room') {
+  const room = defaultRoom(name)
+  rooms.push(room)
+  saveRooms()
+  return room
+}
+
+export function switchRoom (id) {
+  if (!rooms.find(r => r.id === id)) return false
+  activeId = id
+  const room = activeRoom()
+  room.timers.forEach(t => { t.state = 'stopped'; t.elapsed = 0 })
+  room.blackout = false
+  room.flash = false
+  saveRooms()
+  return true
+}
+
+export function updateRoomMeta (id, data) {
+  const room = rooms.find(r => r.id === id)
+  if (!room) return false
+  if (data.name) room.name = data.name
+  saveRooms()
+  return true
+}
+
+export function deleteRoom (id) {
+  if (rooms.length <= 1) return false  // always keep at least one
+  const idx = rooms.findIndex(r => r.id === id)
+  if (idx === -1) return false
+  rooms.splice(idx, 1)
+  if (activeId === id) {
+    activeId = rooms[0].id
+    const room = activeRoom()
+    room.timers.forEach(t => { t.state = 'stopped'; t.elapsed = 0 })
+  }
+  saveRooms()
   return true
 }

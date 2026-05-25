@@ -71,6 +71,41 @@ export function registerIpcHandlers(mainWindow) {
   ipcMain.on('message:remove', (_, id)           => { store.removeMessage(id);        storeBroadcast() })
   ipcMain.on('room:update',    (_, data)         => { store.setState(data);           storeBroadcast() })
 
+  // ── Room management ──────────────────────────────────────────────────────
+  ipcMain.handle('rooms:list',   ()       => store.getRoomsList())
+  ipcMain.handle('rooms:active', ()       => store.getActiveRoomId())
+
+  ipcMain.handle('rooms:add', (_, name) => {
+    const room = store.addRoom(name)
+    return { id: room.id, name: room.name, relayId: room.relayId }
+  })
+
+  ipcMain.handle('rooms:switch', (_, id) => {
+    const ok = store.switchRoom(id)
+    if (ok) {
+      engine.stop()          // halt tick loop on old room
+      engine.start()         // restart on new room (reads state from store)
+      storeBroadcast()
+    }
+    return ok
+  })
+
+  ipcMain.handle('rooms:rename', (_, { id, name }) => {
+    const ok = store.updateRoomMeta(id, { name })
+    if (ok) storeBroadcast()
+    return ok
+  })
+
+  ipcMain.handle('rooms:delete', (_, id) => {
+    const ok = store.deleteRoom(id)
+    if (ok) {
+      engine.stop()
+      engine.start()
+      storeBroadcast()
+    }
+    return ok
+  })
+
   ipcMain.on('connection:kick', (_, { id, source }) => {
     if (source === 'local') kickSocket(id)
     else if (source === 'relay') kickRelayClient(id)

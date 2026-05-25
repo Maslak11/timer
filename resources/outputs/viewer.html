@@ -8,7 +8,7 @@
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;overflow:hidden;user-select:none}
     #app{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
-    #logo{position:absolute;top:20px;left:20px;font-size:13px;color:rgba(255,255,255,0.3)}
+    #logo{position:absolute;top:16px;left:20px;height:28px;opacity:0.35}
     #label{position:absolute;top:20px;right:20px;font-size:13px;font-weight:600;color:#4caf50}
     #live-dot{position:absolute;top:22px;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2)}
     #live-dot.live{background:#e53935;animation:pulse 1s infinite}
@@ -33,7 +33,7 @@
 <div id="blackout"></div>
 <div id="flash"></div>
 <div id="app">
-  <div id="logo">⏱ stagetimer</div>
+  <img id="logo" src="shared/logo.svg" alt="matlak.stream"/>
   <div id="label"></div>
   <div id="live-dot"></div>
   <div id="main-time">--:--</div>

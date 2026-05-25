@@ -31,5 +31,13 @@ contextBridge.exposeInMainWorld('api', {
 
   roomUpdate: (data) => ipcRenderer.send('room:update', data),
 
+  // Multi-room management
+  getRoomsList:  ()            => ipcRenderer.invoke('rooms:list'),
+  getActiveRoom: ()            => ipcRenderer.invoke('rooms:active'),
+  roomAdd:       (name)        => ipcRenderer.invoke('rooms:add', name),
+  roomSwitch:    (id)          => ipcRenderer.invoke('rooms:switch', id),
+  roomRename:    (id, name)    => ipcRenderer.invoke('rooms:rename', { id, name }),
+  roomDelete:    (id)          => ipcRenderer.invoke('rooms:delete', id),
+
   kickConnection: (id, source) => ipcRenderer.send('connection:kick', { id, source })
 })
