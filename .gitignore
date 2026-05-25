@@ -6,3 +6,6 @@ dist/
 *.tmp.*
 web/outputs/
 web/api/config.php
+# NDI runtime DLL — generated in CI, not committed
+resources/ndi/*.dll
+resources/ndi/*.exe

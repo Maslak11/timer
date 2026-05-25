@@ -11,6 +11,15 @@ let captureInterval = null
 
 export async function initNDI () {
   try {
+    // Ensure Windows can find Processing.NDI.Lib.x64.dll when packaged.
+    // electron-builder places it next to the .exe via extraFiles, but we also
+    // add the exe directory to PATH as a belt-and-suspenders measure.
+    if (electronApp.isPackaged) {
+      const { dirname } = await import('path')
+      const exeDir = dirname(electronApp.getPath('exe'))
+      process.env.PATH = `${exeDir};${process.env.PATH ?? ''}`
+    }
+
     // eslint-disable-next-line
     const grandiose = require('@julusian/grandiose')
     const sender = await grandiose.send({

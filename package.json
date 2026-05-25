@@ -52,6 +52,13 @@
         "to": "resources"
       }
     ],
+    "extraFiles": [
+      {
+        "from": "resources/ndi",
+        "to": ".",
+        "filter": ["*.dll"]
+      }
+    ],
     "win": {
       "target": [{"target": "nsis", "arch": ["x64"]}],
       "icon": "resources/icons/icon.ico"
