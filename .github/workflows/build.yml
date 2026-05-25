@@ -43,12 +43,10 @@ jobs:
       # ── SignPath code signing ─────────────────────────────────────────────
       # Requires secrets: SIGNPATH_API_TOKEN, SIGNPATH_ORGANIZATION_ID
       # Apply for free Open Source plan at: https://about.signpath.io/product/open-source
+      # Enable by adding repository variable: SIGNPATH_ENABLED = true
       - name: Sign with SignPath
         id: signpath
-        if: >
-          vars.SIGNPATH_ENABLED == 'true' &&
-          secrets.SIGNPATH_API_TOKEN != '' &&
-          secrets.SIGNPATH_ORGANIZATION_ID != ''
+        if: vars.SIGNPATH_ENABLED == 'true'
         uses: signpath/github-action-submit-signing-request@v1.1
         with:
           api-token:                  '${{ secrets.SIGNPATH_API_TOKEN }}'
