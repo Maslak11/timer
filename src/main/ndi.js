@@ -11,17 +11,20 @@ let captureInterval = null
 
 export async function initNDI () {
   try {
-    // Ensure Windows can find Processing.NDI.Lib.x64.dll when packaged.
-    // electron-builder places it next to the .exe via extraFiles, but we also
-    // add the exe directory to PATH as a belt-and-suspenders measure.
+    // In packaged app, load the pre-built grandiose.node from resources/ndi/.
+    // The NDI runtime DLL (Processing.NDI.Lib.x64.dll) is next to the .exe
+    // (placed there by electron-builder extraFiles from resources/ndi/).
+    // In dev mode, load from node_modules/grandiose normally.
+    let grandiose
     if (electronApp.isPackaged) {
-      const { dirname } = await import('path')
-      const exeDir = dirname(electronApp.getPath('exe'))
+      const exeDir = require('path').dirname(electronApp.getPath('exe'))
       process.env.PATH = `${exeDir};${process.env.PATH ?? ''}`
+      // eslint-disable-next-line
+      grandiose = require(join(process.resourcesPath, 'resources', 'ndi', 'grandiose-loader.js'))
+    } else {
+      // eslint-disable-next-line
+      grandiose = require('grandiose')
     }
-
-    // eslint-disable-next-line
-    const grandiose = require('grandiose')
     const sender = await grandiose.send({
       name:        'StageTimer Output',
       clockVideo:  true,
