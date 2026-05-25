@@ -22,38 +22,28 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      # ── NDI SDK (enables bundled NDI output — no user install required) ──────
-      # Downloads the free NDI 6 SDK, installs silently, copies the runtime DLL.
-      # The DLL is placed next to StageTimer.exe by electron-builder extraFiles.
-      # If the download fails the build continues without NDI support.
-      - name: Create NDI resources directory
-        shell: pwsh
-        run: New-Item -ItemType Directory -Force "resources\ndi" | Out-Null
-
-      - name: Download & install NDI SDK
+      # ── NDI SDK — needed to compile @julusian/grandiose native module ────────
+      # The NDI runtime DLL (Processing.NDI.Lib.x64.dll) is already committed
+      # to resources/ndi/ and bundled next to the .exe via electron-builder
+      # extraFiles. This step only downloads the SDK dev headers/libs needed
+      # to compile the native Node.js addon for Electron 33.
+      # If the download fails the build continues — NDI button will show
+      # "brak SDK" but the rest of the app works normally.
+      - name: Download & install NDI 6 SDK (for grandiose native module)
         id: ndi
         shell: pwsh
         continue-on-error: true
         run: |
           $url = if ($env:NDI_SDK_URL) { $env:NDI_SDK_URL } `
                  else { "https://downloads.ndi.tv/SDK/NDI_SDK/NDI%206%20SDK%20for%20Windows.exe" }
-          Write-Host "Downloading NDI SDK from: $url"
+          Write-Host "Downloading NDI 6 SDK from: $url"
           Invoke-WebRequest -Uri $url -OutFile "ndi_installer.exe" -UseBasicParsing -TimeoutSec 180
-          Write-Host "Installing silently..."
           Start-Process -Wait -FilePath ".\ndi_installer.exe" -ArgumentList "/S"
-
-          # Find the installed runtime DLL (NDI 6 or 5 fallback)
-          $dll = @(
-            "C:\Program Files\NDI\NDI 6 SDK\Bin\x64\Processing.NDI.Lib.x64.dll",
-            "C:\Program Files\NDI\NDI 5 SDK\Bin\x64\Processing.NDI.Lib.x64.dll"
-          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-          if ($dll) {
-            Copy-Item $dll "resources\ndi\Processing.NDI.Lib.x64.dll"
-            Write-Host "✅ NDI DLL bundled from: $dll"
-            "NDI_AVAILABLE=true" | Out-File $env:GITHUB_ENV -Append
+          if (Test-Path "C:\Program Files\NDI\NDI 6 SDK") {
+            Write-Host "✅ NDI 6 SDK installed at: C:\Program Files\NDI\NDI 6 SDK"
+            "NDI_SDK_OK=true" | Out-File $env:GITHUB_ENV -Append
           } else {
-            Write-Warning "NDI DLL not found — app will build without NDI support"
+            Write-Warning "NDI SDK not found after install — grandiose will not be compiled"
           }
         env:
           NDI_SDK_URL: ${{ secrets.NDI_SDK_URL }}
@@ -69,8 +59,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          # NDI SDK paths for rebuilding @julusian/grandiose against Electron ABI
-          NDI_SDK_V5_DIR: C:\Program Files\NDI\NDI 5 SDK
+          # Point @julusian/grandiose binding.gyp to the NDI 6 SDK
+          # NDI_SDK_V5_DIR also set to NDI 6 path (API-compatible, covers older binding.gyp)
+          NDI_SDK_V5_DIR: C:\Program Files\NDI\NDI 6 SDK
           NDI_SDK_V6_DIR: C:\Program Files\NDI\NDI 6 SDK
 
       - name: Upload unsigned installer artifact
