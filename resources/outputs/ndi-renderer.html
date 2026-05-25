@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>StageTimer — NDI Output</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{
+      width:1920px;height:1080px;overflow:hidden;
+      background:#000;color:#fff;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      user-select:none
+    }
+    #app{
+      width:1920px;height:1080px;
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      position:relative
+    }
+    /* NDI badge */
+    #ndi-badge{
+      position:absolute;top:28px;right:36px;
+      font-size:18px;font-weight:700;letter-spacing:3px;
+      color:rgba(255,255,255,0.25);text-transform:uppercase
+    }
+    /* Logo watermark */
+    #logo{
+      position:absolute;top:28px;left:36px;
+      height:44px;opacity:0.3
+    }
+    /* Timer name label */
+    #label{
+      position:absolute;top:36px;left:50%;transform:translateX(-50%);
+      font-size:22px;font-weight:600;letter-spacing:1px;
+      color:#4caf50;white-space:nowrap
+    }
+    /* Running indicator dot */
+    #live-dot{
+      position:absolute;top:42px;left:50%;transform:translateX(-50%) translateX(0);
+      margin-left:140px;
+      width:12px;height:12px;border-radius:50%;
+      background:rgba(255,255,255,0.15)
+    }
+    #live-dot.live{background:#e53935;animation:pulse 1s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+    /* Main timer display */
+    #main-time{
+      font-size:280px;font-weight:800;
+      letter-spacing:-6px;line-height:1;
+      font-variant-numeric:tabular-nums;
+      text-shadow:0 0 80px rgba(255,255,255,0.1);
+      transition:color 0.3s
+    }
+    #main-time.overtime{color:#e53935}
+    /* Message overlay */
+    #message{
+      position:absolute;bottom:160px;
+      left:50%;transform:translateX(-50%);
+      font-size:48px;font-weight:500;
+      text-align:center;
+      padding:0 80px;
+      white-space:pre-wrap;
+      opacity:0;transition:opacity 0.4s
+    }
+    #message.visible{opacity:1}
+    /* Progress bar */
+    #progress-bar{
+      position:absolute;bottom:60px;
+      left:60px;right:60px;
+      height:12px;background:rgba(255,255,255,0.1);
+      border-radius:6px;overflow:hidden
+    }
+    #progress-fill{
+      height:100%;width:0%;
+      background:#4caf50;
+      transition:width 0.12s linear,background 0.3s
+    }
+    /* Bottom color strip */
+    #color-bar{
+      position:absolute;bottom:0;left:0;right:0;
+      height:16px;display:flex
+    }
+    #color-bar div{flex:1}
+    /* Blackout / flash */
+    #blackout{
+      position:fixed;inset:0;background:#000;
+      opacity:0;pointer-events:none;
+      transition:opacity 0.25s;z-index:100
+    }
+    #blackout.on{opacity:1}
+    #flash{
+      position:fixed;inset:0;background:#fff;
+      opacity:0;pointer-events:none;z-index:99
+    }
+    #flash.on{animation:flash-anim 0.5s infinite}
+    @keyframes flash-anim{0%,100%{opacity:0}50%{opacity:0.85}}
+  </style>
+</head>
+<body>
+<div id="blackout"></div>
+<div id="flash"></div>
+<div id="app">
+  <img id="logo" src="shared/logo.svg" alt="matlak.stream"/>
+  <div id="ndi-badge">NDI OUTPUT</div>
+  <div id="label"></div>
+  <div id="live-dot"></div>
+  <div id="main-time">--:--</div>
+  <div id="message"></div>
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+  <div id="color-bar">
+    <div style="background:#4caf50;flex:1"></div>
+    <div style="background:#ff9800;flex:0.4"></div>
+    <div style="background:#e53935;flex:0.2"></div>
+  </div>
+</div>
+<script>
+function fmt(sec) {
+  const abs = Math.abs(sec)
+  const h = Math.floor(abs / 3600)
+  const m = Math.floor((abs % 3600) / 60)
+  const s = Math.floor(abs % 60)
+  if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
+}
+
+window.onTimerState = function(state) {
+  const timer = state.timers && state.timers[state.activeTimerIndex]
+
+  document.getElementById('blackout').className = state.blackout ? 'on' : ''
+  document.getElementById('flash').className   = state.flash    ? 'on' : ''
+
+  if (!timer) return
+
+  const remaining = timer.type === 'countdown'
+    ? timer.duration - timer.elapsed
+    : timer.elapsed
+  const overtime  = timer.type === 'countdown' && timer.elapsed > timer.duration
+  const progress  = timer.duration > 0 ? Math.min(timer.elapsed / timer.duration, 1) : 0
+
+  const timeEl = document.getElementById('main-time')
+  timeEl.textContent = (overtime ? '+' : '') + fmt(Math.abs(remaining))
+  timeEl.className   = overtime ? 'overtime' : ''
+
+  const barColor = overtime || Math.abs(remaining) < 60  ? '#e53935'
+                 : Math.abs(remaining) < 300             ? '#ff9800'
+                 : '#4caf50'
+  document.getElementById('progress-fill').style.width      = (progress * 100) + '%'
+  document.getElementById('progress-fill').style.background = barColor
+
+  document.getElementById('label').textContent    = timer.name || ''
+  document.getElementById('live-dot').className   = timer.state === 'running' ? 'live' : ''
+
+  const msg   = state.messages && state.messages.find(m => m.visible)
+  const msgEl = document.getElementById('message')
+  if (msg) {
+    msgEl.textContent  = msg.text
+    msgEl.style.color  = msg.color === 'white' ? '#e8e8e8' : msg.color
+    msgEl.style.fontWeight = msg.bold ? 700 : 400
+    msgEl.className    = 'visible'
+  } else {
+    msgEl.className    = ''
+  }
+}
+</script>
+</body>
+</html>
