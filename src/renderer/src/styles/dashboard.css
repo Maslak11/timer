@@ -64,6 +64,40 @@
 /* Toolbar logo */
 .toolbar-logo { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 
+/* ── Tools menu (···) ── */
+.tools-menu-wrap {
+  position: relative;
+}
+.tools-menu {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px; min-width: 200px; z-index: 200;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.tools-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; color: var(--text);
+  background: none; border: none; width: 100%; text-align: left;
+  font-family: inherit;
+}
+.tools-menu-item:hover { background: var(--bg3); }
+.tools-menu-item:disabled { opacity: 0.4; cursor: default; }
+.tools-menu-item:disabled:hover { background: none; }
+.tools-menu-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--text3);
+}
+.tools-menu-status-dot.active { background: var(--green); animation: pulse 1.5s infinite; }
+.tools-menu-item-label { flex: 1; }
+.tools-menu-item-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  padding: 1px 6px; border-radius: 4px; flex-shrink: 0;
+}
+.tools-menu-item-badge.on  { background: rgba(76,175,80,0.18); color: var(--green); }
+.tools-menu-item-badge.off { background: var(--bg4); color: var(--text2); }
+.tools-menu-item-badge.na  { background: var(--bg4); color: var(--text3); }
+
 /* ── Dashboard layout ── */
 .dashboard {
   display: grid;

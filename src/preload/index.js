@@ -39,5 +39,9 @@ contextBridge.exposeInMainWorld('api', {
   roomRename:    (id, name)    => ipcRenderer.invoke('rooms:rename', { id, name }),
   roomDelete:    (id)          => ipcRenderer.invoke('rooms:delete', id),
 
-  kickConnection: (id, source) => ipcRenderer.send('connection:kick', { id, source })
+  kickConnection: (id, source) => ipcRenderer.send('connection:kick', { id, source }),
+
+  // NDI output
+  ndiStatus: ()  => ipcRenderer.invoke('ndi:status'),
+  ndiToggle: ()  => ipcRenderer.invoke('ndi:toggle')
 })

@@ -3,19 +3,23 @@ import OutputLinksModal from './OutputLinksModal.jsx'
 import RoomSettingsModal from './RoomSettingsModal.jsx'
 
 export default function Toolbar({ state }) {
-  const [showOutputs,  setShowOutputs]  = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  const [showRoomMenu, setShowRoomMenu] = useState(false)
-  const [rooms,        setRooms]        = useState([])
-  const [activeRoomId, setActiveRoomId] = useState(null)
-  const [renaming,     setRenaming]     = useState(null) // id being renamed
-  const [renameVal,    setRenameVal]    = useState('')
-  const menuRef = useRef(null)
+  const [showOutputs,   setShowOutputs]  = useState(false)
+  const [showSettings,  setShowSettings] = useState(false)
+  const [showRoomMenu,  setShowRoomMenu] = useState(false)
+  const [showToolsMenu, setShowToolsMenu]= useState(false)
+  const [rooms,         setRooms]        = useState([])
+  const [activeRoomId,  setActiveRoomId] = useState(null)
+  const [renaming,      setRenaming]     = useState(null)
+  const [renameVal,     setRenameVal]    = useState('')
+  const [ndiStatus,     setNdiStatus]    = useState({ available: false, active: false })
+
+  const roomMenuRef  = useRef(null)
+  const toolsMenuRef = useRef(null)
 
   const blackout = state?.blackout
   const flash    = state?.flash
 
-  // Load rooms list
+  // ── Load rooms list ──────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       const [list, active] = await Promise.all([
@@ -26,18 +30,41 @@ export default function Toolbar({ state }) {
       setActiveRoomId(active)
     }
     load()
-  }, [state?.id]) // reload when active room id changes
+  }, [state?.id])
 
-  // Close menu on outside click
+  // ── Poll NDI status every 2s ─────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchNDI() {
+      if (!window.api.ndiStatus) return
+      const s = await window.api.ndiStatus()
+      setNdiStatus(s || { available: false, active: false })
+    }
+    fetchNDI()
+    const t = setInterval(fetchNDI, 2000)
+    return () => clearInterval(t)
+  }, [])
+
+  // ── Close room menu on outside click ─────────────────────────────────────
   useEffect(() => {
     if (!showRoomMenu) return
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setShowRoomMenu(false)
+    const h = (e) => {
+      if (roomMenuRef.current && !roomMenuRef.current.contains(e.target)) setShowRoomMenu(false)
     }
-    window.addEventListener('mousedown', handler)
-    return () => window.removeEventListener('mousedown', handler)
+    window.addEventListener('mousedown', h)
+    return () => window.removeEventListener('mousedown', h)
   }, [showRoomMenu])
 
+  // ── Close tools menu on outside click ────────────────────────────────────
+  useEffect(() => {
+    if (!showToolsMenu) return
+    const h = (e) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) setShowToolsMenu(false)
+    }
+    window.addEventListener('mousedown', h)
+    return () => window.removeEventListener('mousedown', h)
+  }, [showToolsMenu])
+
+  // ── Room actions ─────────────────────────────────────────────────────────
   async function handleSwitchRoom(id) {
     if (id === activeRoomId) return
     await window.api.roomSwitch(id)
@@ -79,12 +106,29 @@ export default function Toolbar({ state }) {
     setRenaming(null)
   }
 
+  // ── NDI toggle ───────────────────────────────────────────────────────────
+  async function handleNDIToggle() {
+    if (!ndiStatus.available) return
+    const active = await window.api.ndiToggle()
+    setNdiStatus(s => ({ ...s, active }))
+  }
+
+  const ndiLabel = !ndiStatus.available ? 'NDI nie zainstalowane'
+                 : ndiStatus.active     ? 'Wyłącz NDI Output'
+                 :                        'Włącz NDI Output'
+  const ndiBadge = !ndiStatus.available ? 'na'
+                 : ndiStatus.active     ? 'on'
+                 :                        'off'
+  const ndiBadgeText = !ndiStatus.available ? 'brak SDK'
+                     : ndiStatus.active     ? 'ON'
+                     :                        'OFF'
+
   return (
     <>
       <div className="toolbar">
+        {/* ── Left: room selector + output links ── */}
         <div className="toolbar-left">
-          {/* Room selector */}
-          <div className="room-selector" ref={menuRef} onClick={() => setShowRoomMenu(v => !v)}>
+          <div className="room-selector" ref={roomMenuRef} onClick={() => setShowRoomMenu(v => !v)}>
             <span className="room-icon">📡</span>
             <span className="room-name">{state?.name || 'Room'}</span>
             <span className="room-arrow">▾</span>
@@ -104,17 +148,23 @@ export default function Toolbar({ state }) {
                         autoFocus
                         onClick={e => e.stopPropagation()}
                         onChange={e => setRenameVal(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') commitRename(r.id); if (e.key === 'Escape') setRenaming(null) }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter')  commitRename(r.id)
+                          if (e.key === 'Escape') setRenaming(null)
+                        }}
                         onBlur={() => commitRename(r.id)}
                       />
                     ) : (
                       <>
-                        <span className="room-item-dot" style={{ background: r.id === activeRoomId ? 'var(--green)' : 'var(--border)' }} />
+                        <span className="room-item-dot"
+                          style={{ background: r.id === activeRoomId ? 'var(--green)' : 'var(--border)' }} />
                         <span className="room-item-name">{r.name}</span>
                         <span className="room-item-id">{r.relayId}</span>
-                        <button className="room-item-btn" title="Rename" onClick={e => handleRenameRoom(e, r.id)}>✎</button>
+                        <button className="room-item-btn" title="Rename"
+                          onClick={e => handleRenameRoom(e, r.id)}>✎</button>
                         {rooms.length > 1 && (
-                          <button className="room-item-btn room-item-del" title="Delete" onClick={e => handleDeleteRoom(e, r.id)}>✕</button>
+                          <button className="room-item-btn room-item-del" title="Delete"
+                            onClick={e => handleDeleteRoom(e, r.id)}>✕</button>
                         )}
                       </>
                     )}
@@ -123,7 +173,8 @@ export default function Toolbar({ state }) {
                 <div className="room-menu-sep" />
                 <button className="room-menu-add" onClick={handleAddRoom}>+ New Room</button>
                 <div className="room-menu-sep" />
-                <button className="room-menu-settings" onClick={() => { setShowSettings(true); setShowRoomMenu(false) }}>
+                <button className="room-menu-settings"
+                  onClick={() => { setShowSettings(true); setShowRoomMenu(false) }}>
                   ⚙ Room Settings
                 </button>
               </div>
@@ -136,11 +187,15 @@ export default function Toolbar({ state }) {
           </button>
         </div>
 
-        {/* Logo centre */}
+        {/* ── Centre: logo ── */}
         <div className="toolbar-logo">
-          <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNjAgOTAiIGZpbGw9Im5vbmUiPjxyZWN0IHg9IjMiIHk9IjMiIHdpZHRoPSIxMjAiIGhlaWdodD0iNzIiIHJ4PSIxMCIgZmlsbD0iIzFiMjYzNiIgc3Ryb2tlPSIjOWFhYmI4IiBzdHJva2Utd2lkdGg9IjQiLz48dGV4dCB4PSIxNCIgeT0iNjMiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxBcmlhbCxzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iOTAwIiBmb250LXNpemU9IjU2IiBmaWxsPSIjOWFhYmI4Ij5NPC90ZXh0Pjx0ZXh0IHg9IjcxIiB5PSI2MyIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLEFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iNTYiIGZpbGw9IiMyOWI5ZTgiPlM8L3RleHQ+PHRleHQgeD0iMTM0IiB5PSI0MiIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5YWFiYjgiPm1hdGxhay48L3RleHQ+PHRleHQgeD0iMTM0IiB5PSI2OCIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiMyOWI5ZTgiPnN0cmVhbTwvdGV4dD48L3N2Zz4=" alt="matlak.stream" height="32" style={{ opacity: 0.85 }} />
+          <img
+            src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNjAgOTAiIGZpbGw9Im5vbmUiPjxyZWN0IHg9IjMiIHk9IjMiIHdpZHRoPSIxMjAiIGhlaWdodD0iNzIiIHJ4PSIxMCIgZmlsbD0iIzFiMjYzNiIgc3Ryb2tlPSIjOWFhYmI4IiBzdHJva2Utd2lkdGg9IjQiLz48dGV4dCB4PSIxNCIgeT0iNjMiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxBcmlhbCxzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iOTAwIiBmb250LXNpemU9IjU2IiBmaWxsPSIjOWFhYmI4Ij5NPC90ZXh0Pjx0ZXh0IHg9IjcxIiB5PSI2MyIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLEFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iNTYiIGZpbGw9IiMyOWI5ZTgiPlM8L3RleHQ+PHRleHQgeD0iMTM0IiB5PSI0MiIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5YWFiYjgiPm1hdGxhay48L3RleHQ+PHRleHQgeD0iMTM0IiB5PSI2OCIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiMyOWI5ZTgiPnN0cmVhbTwvdGV4dD48L3N2Zz4="
+            alt="matlak.stream" height="32" style={{ opacity: 0.85 }}
+          />
         </div>
 
+        {/* ── Right: blackout, flash, ··· ── */}
         <div className="toolbar-right">
           <button
             className={`btn btn-sm ${blackout ? 'btn-danger' : 'btn-ghost'}`}
@@ -155,11 +210,46 @@ export default function Toolbar({ state }) {
           >
             ⚡ Flash
           </button>
-          <button className="btn btn-ghost btn-sm btn-icon" style={{ marginLeft: 6 }}>···</button>
+
+          {/* ··· tools menu */}
+          <div className="tools-menu-wrap" ref={toolsMenuRef} style={{ marginLeft: 6 }}>
+            <button
+              className={`btn btn-ghost btn-sm btn-icon${showToolsMenu ? ' active' : ''}`}
+              onClick={() => setShowToolsMenu(v => !v)}
+              title="Narzędzia"
+            >
+              ···
+            </button>
+
+            {showToolsMenu && (
+              <div className="tools-menu">
+                {/* NDI Output toggle */}
+                <button
+                  className="tools-menu-item"
+                  disabled={!ndiStatus.available}
+                  onClick={async () => { await handleNDIToggle(); setShowToolsMenu(false) }}
+                >
+                  <span className={`tools-menu-status-dot${ndiStatus.active ? ' active' : ''}`} />
+                  <span className="tools-menu-item-label">{ndiLabel}</span>
+                  <span className={`tools-menu-item-badge ${ndiBadge}`}>{ndiBadgeText}</span>
+                </button>
+
+                <div className="room-menu-sep" />
+
+                <button
+                  className="tools-menu-item"
+                  onClick={() => { setShowSettings(true); setShowToolsMenu(false) }}
+                >
+                  <span style={{ fontSize: 14 }}>⚙</span>
+                  <span className="tools-menu-item-label">Room Settings</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {showOutputs  && <OutputLinksModal onClose={() => setShowOutputs(false)} />}
+      {showOutputs  && <OutputLinksModal  onClose={() => setShowOutputs(false)} />}
       {showSettings && <RoomSettingsModal state={state} onClose={() => setShowSettings(false)} />}
     </>
   )

@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import * as store from './timer-store.js'
 import * as engine from './timer-engine.js'
 import { getPort, addBroadcastListener, broadcastState, getSocketConnections, kickSocket } from './web-server.js'
-import { isNDIAvailable } from './ndi.js'
+import { isNDIAvailable, isNDIActive, enableNDICapture, disableNDICapture } from './ndi.js'
 import { getRelayInfo, getRelayConnections, kickRelayClient } from './relay.js'
 import os from 'os'
 import QRCode from 'qrcode'
@@ -40,6 +40,12 @@ export function registerIpcHandlers(mainWindow) {
   }
 
   ipcMain.handle('get-state', () => store.getState())
+
+  ipcMain.handle('ndi:status', () => ({ available: isNDIAvailable(), active: isNDIActive() }))
+  ipcMain.handle('ndi:toggle', () => {
+    if (isNDIActive()) { disableNDICapture(); return false }
+    else { return enableNDICapture() }
+  })
 
   ipcMain.handle('get-server-info', async () => {
     const ip = getLocalIP()

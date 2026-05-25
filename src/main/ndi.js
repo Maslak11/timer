@@ -107,6 +107,22 @@ export function isNDIAvailable () {
   return ndiAvailable
 }
 
+export function isNDIActive () {
+  return !!(ndiWindow && !ndiWindow.isDestroyed() && captureInterval)
+}
+
+export function enableNDICapture () {
+  if (!ndiAvailable) return false
+  if (isNDIActive()) return true   // already running
+  createNDIWindow()
+  return true
+}
+
+export function disableNDICapture () {
+  if (captureInterval) { clearInterval(captureInterval); captureInterval = null }
+  if (ndiWindow && !ndiWindow.isDestroyed()) { ndiWindow.close(); ndiWindow = null }
+}
+
 export function cleanup () {
   if (captureInterval) {
     clearInterval(captureInterval)
