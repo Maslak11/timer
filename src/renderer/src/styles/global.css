@@ -104,6 +104,12 @@ select option { background: var(--bg3); }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 .btn-icon { padding: 6px; border-radius: 6px; line-height: 1; }
 .btn-icon:hover { background: var(--bg3); }
+.btn-ndi { background: var(--bg3); color: var(--text2); border: 1px solid transparent; }
+.btn-ndi:hover { background: var(--bg4); color: var(--text); }
+.btn-ndi.on { background: rgba(76,175,80,0.15); color: var(--green); border-color: var(--green-dim); }
+.btn-ndi.on:hover { background: rgba(76,175,80,0.25); }
+.btn-ndi:disabled { opacity: 0.35; cursor: default; }
+.btn-ndi:disabled:hover { background: var(--bg3); color: var(--text2); }
 
 .tag {
   display: inline-block; padding: 2px 8px;

@@ -113,16 +113,6 @@ export default function Toolbar({ state }) {
     setNdiStatus(s => ({ ...s, active }))
   }
 
-  const ndiLabel = !ndiStatus.available ? 'NDI nie zainstalowane'
-                 : ndiStatus.active     ? 'Wyłącz NDI Output'
-                 :                        'Włącz NDI Output'
-  const ndiBadge = !ndiStatus.available ? 'na'
-                 : ndiStatus.active     ? 'on'
-                 :                        'off'
-  const ndiBadgeText = !ndiStatus.available ? 'brak SDK'
-                     : ndiStatus.active     ? 'ON'
-                     :                        'OFF'
-
   return (
     <>
       <div className="toolbar">
@@ -195,7 +185,7 @@ export default function Toolbar({ state }) {
           />
         </div>
 
-        {/* ── Right: blackout, flash, ··· ── */}
+        {/* ── Right: blackout, flash, NDI, ··· ── */}
         <div className="toolbar-right">
           <button
             className={`btn btn-sm ${blackout ? 'btn-danger' : 'btn-ghost'}`}
@@ -211,31 +201,33 @@ export default function Toolbar({ state }) {
             ⚡ Flash
           </button>
 
+          {/* NDI toggle button */}
+          <button
+            className={`btn btn-sm btn-ndi${ndiStatus.active ? ' on' : ''}`}
+            disabled={!ndiStatus.available}
+            onClick={handleNDIToggle}
+            title={
+              !ndiStatus.available ? 'NDI SDK nie zainstalowane — pobierz z ndi.tv'
+              : ndiStatus.active   ? 'Wyłącz NDI Output'
+              :                      'Włącz NDI Output'
+            }
+            style={{ marginLeft: 6 }}
+          >
+            ◈ NDI
+          </button>
+
           {/* ··· tools menu */}
           <div className="tools-menu-wrap" ref={toolsMenuRef} style={{ marginLeft: 6 }}>
             <button
               className={`btn btn-ghost btn-sm btn-icon${showToolsMenu ? ' active' : ''}`}
               onClick={() => setShowToolsMenu(v => !v)}
-              title="Narzędzia"
+              title="Więcej opcji"
             >
               ···
             </button>
 
             {showToolsMenu && (
               <div className="tools-menu">
-                {/* NDI Output toggle */}
-                <button
-                  className="tools-menu-item"
-                  disabled={!ndiStatus.available}
-                  onClick={async () => { await handleNDIToggle(); setShowToolsMenu(false) }}
-                >
-                  <span className={`tools-menu-status-dot${ndiStatus.active ? ' active' : ''}`} />
-                  <span className="tools-menu-item-label">{ndiLabel}</span>
-                  <span className={`tools-menu-item-badge ${ndiBadge}`}>{ndiBadgeText}</span>
-                </button>
-
-                <div className="room-menu-sep" />
-
                 <button
                   className="tools-menu-item"
                   onClick={() => { setShowSettings(true); setShowToolsMenu(false) }}
