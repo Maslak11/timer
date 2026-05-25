@@ -1,7 +1,7 @@
 import FtpDeploy from 'ftp-deploy'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { cpSync, writeFileSync, existsSync } from 'fs'
+import { cpSync, writeFileSync, existsSync, unlinkSync } from 'fs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
@@ -53,8 +53,7 @@ ftpDeploy.on('uploading', d => process.stdout.write(`\r  ${d.transferredFileCoun
 ftpDeploy.deploy(ftpConfig)
   .then(() => {
     console.log('\nFTP deploy complete → timer.matlak.stream')
-    // Clean up generated config (don't leave credentials in working dir)
-    const { unlinkSync } = await import('fs')
+    // Clean up generated config so credentials don't linger in working dir
     try { unlinkSync(join(webDir, 'api', 'config.php')) } catch {}
   })
   .catch(err => { console.error('\nFTP deploy failed:', err); process.exit(1) })
