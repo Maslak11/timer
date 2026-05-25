@@ -1,13 +1,15 @@
-// Relay client — used by output views when accessed via timer.matlak.stream
-// Activated when URL has ?relay=BASE_URL&id=ROOM_ID params
+// Relay client — SSE mode when URL contains ?relay=BASE&id=ROOM_ID
+// Skips socket-client.js (local WS) entirely when relay mode is active
 ;(function () {
   const params = new URLSearchParams(location.search)
-  const RELAY  = params.get('relay')   // e.g. https://timer.matlak.stream
+  const RELAY  = params.get('relay')
   const ROOM   = (params.get('id') || '').toUpperCase()
 
-  if (!RELAY || !ROOM) return   // no relay mode, socket-client.js handles local
+  if (!RELAY || !ROOM) return  // local mode — socket-client.js handles it
 
-  // Override window.sendCommand so output view controls POST to relay
+  window.__relayMode = true
+
+  // --- Commands to desktop app via relay ---
   window.sendCommand = function (action, data) {
     fetch(RELAY + '/api/command.php', {
       method: 'POST',
@@ -16,17 +18,37 @@
     }).catch(() => {})
   }
 
+  // --- Initial state fetch (instant, before SSE delivers) ---
+  function fetchState () {
+    fetch(RELAY + '/api/state.php?id=' + ROOM)
+      .then(r => r.ok ? r.json() : null)
+      .then(s => { if (s && window.onTimerState) window.onTimerState(s) })
+      .catch(() => {})
+  }
+
+  // --- SSE for live updates ---
   let es = null
+  let retryDelay = 2000
 
   function connect () {
-    if (es) es.close()
+    if (es) { try { es.close() } catch {} }
+
     es = new EventSource(RELAY + '/api/events.php?id=' + ROOM)
 
     es.addEventListener('state', e => {
       try {
-        const state = JSON.parse(e.data)
-        if (window.onTimerState) window.onTimerState(state)
+        retryDelay = 2000
+        if (window.onTimerState) window.onTimerState(JSON.parse(e.data))
+        if (window.onConnect) window.onConnect()
       } catch {}
+    })
+
+    es.addEventListener('error', () => {
+      // PHP sent event: error (room not found / not yet registered)
+      if (window.onDisconnect) window.onDisconnect('waiting')
+      es.close()
+      retryDelay = Math.min(retryDelay * 1.5, 10000)
+      setTimeout(connect, retryDelay)
     })
 
     es.addEventListener('reconnect', () => {
@@ -34,18 +56,15 @@
       setTimeout(connect, 500)
     })
 
-    es.addEventListener('error', () => {
+    // Network-level error
+    es.onerror = () => {
+      if (window.onDisconnect) window.onDisconnect('offline')
       es.close()
-      setTimeout(connect, 3000)
-    })
-
-    es.addEventListener('connected', e => {
-      console.log('Relay connected to room', ROOM)
-    })
+      retryDelay = Math.min(retryDelay * 1.5, 10000)
+      setTimeout(connect, retryDelay)
+    }
   }
 
+  fetchState()
   connect()
-
-  // Suppress socket-client.js from loading (it would try local WebSocket)
-  window.__relayMode = true
 })()

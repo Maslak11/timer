@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { getState } from './timer-store.js'
 import * as engine from './timer-engine.js'
 import * as store from './timer-store.js'
+import { broadcastState } from './web-server.js'
 
 const RELAY_URL = 'https://timer.matlak.stream'
 const CONFIG_FILE = join(app.getPath('userData'), 'relay.json')
@@ -53,23 +54,30 @@ async function pushState () {
 }
 
 function handleRemoteCommand (cmd) {
+  let needsBroadcast = false
   switch (cmd.action) {
-    case 'start':           engine.startTimer(cmd.id || null); break
-    case 'pause':           engine.pauseTimer(cmd.id || null); break
-    case 'stop':            engine.stopTimer(cmd.id || null); break
-    case 'reset':           engine.resetTimer(cmd.id || null); break
-    case 'adjust':          engine.adjustTimer(cmd.id || null, cmd.seconds || 60); break
-    case 'next':            engine.nextTimer(); break
-    case 'prev':            engine.prevTimer(); break
-    case 'blackout':        engine.setBlackout(cmd.value); break
-    case 'flash':           engine.setFlash(cmd.value); break
-    case 'message:show':    store.updateMessage(cmd.id, { visible: true }); break
-    case 'message:hide':    store.updateMessage(cmd.id, { visible: false }); break
-    case 'message:update':  store.updateMessage(cmd.id, cmd.data); break
-    case 'timer:add':       store.addTimer(cmd.data); break
-    case 'timer:update':    store.updateTimer(cmd.id, cmd.data); break
-    case 'timer:remove':    store.removeTimer(cmd.id); break
+    // Engine actions — broadcast automatically via the 100ms tick loop
+    case 'start':    engine.startTimer(cmd.id || null); break
+    case 'pause':    engine.pauseTimer(cmd.id || null); break
+    case 'stop':     engine.stopTimer(cmd.id || null); break
+    case 'reset':    engine.resetTimer(cmd.id || null); break
+    case 'adjust':   engine.adjustTimer(cmd.id || null, cmd.seconds || 60); break
+    case 'next':     engine.nextTimer(); break
+    case 'prev':     engine.prevTimer(); break
+    case 'blackout': engine.setBlackout(cmd.value); break
+    case 'flash':    engine.setFlash(cmd.value); break
+    // Store mutations — must broadcast manually so Electron renderer + web clients update
+    case 'message:show':   store.updateMessage(cmd.id, { visible: true });  needsBroadcast = true; break
+    case 'message:hide':   store.updateMessage(cmd.id, { visible: false }); needsBroadcast = true; break
+    case 'message:update': store.updateMessage(cmd.id, cmd.data);           needsBroadcast = true; break
+    case 'message:add':    store.addMessage(cmd.data);                      needsBroadcast = true; break
+    case 'message:remove': store.removeMessage(cmd.id);                     needsBroadcast = true; break
+    case 'timer:add':      store.addTimer(cmd.data);                        needsBroadcast = true; break
+    case 'timer:update':   store.updateTimer(cmd.id, cmd.data);             needsBroadcast = true; break
+    case 'timer:remove':   store.removeTimer(cmd.id);                       needsBroadcast = true; break
+    case 'room:update':    store.setState(cmd.data);                        needsBroadcast = true; break
   }
+  if (needsBroadcast) broadcastState()
 }
 
 export function startRelay () {

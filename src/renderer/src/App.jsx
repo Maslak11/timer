@@ -19,7 +19,6 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className={`flash-overlay ${state.flash ? 'on' : ''}`} />
       <Toolbar state={state} />
       <div className="dashboard">
         <DashboardPreview state={state} />
