@@ -97,6 +97,7 @@
   </style>
 </head>
 <body>
+<span id="_tick" style="position:absolute;opacity:0;pointer-events:none;font-size:1px">0</span>
 <div id="blackout"></div>
 <div id="flash"></div>
 <div id="app">
@@ -122,6 +123,15 @@ function fmt(sec) {
   if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
   return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
 }
+
+// ── Force continuous repaints so offscreen paint events actually fire ──────────
+// Without this, Chromium never emits paint events for a static page, so
+// capturePage() returns an empty image and _frameCount stays 0.
+;(function forcePaint() {
+  var el = document.getElementById('_tick')
+  el.textContent = (parseInt(el.textContent, 10) || 0) + 1
+  requestAnimationFrame(forcePaint)
+})()
 
 window.onTimerState = function(state) {
   const timer = state.timers && state.timers[state.activeTimerIndex]
