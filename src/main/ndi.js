@@ -47,6 +47,7 @@ export async function initNDI () {
 
 let _frameCount      = 0
 let _frameErrLogged  = false
+let _invalidateTimer = null
 
 export function createNDIWindow () {
   ndiWindow = new BrowserWindow({
@@ -54,8 +55,8 @@ export function createNDIWindow () {
     height: 1080,
     show:   false,
     webPreferences: {
-      offscreen:            true,   // key: software render directly to buffer
-      backgroundThrottling: false,  // don't pause when hidden
+      offscreen:            true,   // software-render to buffer, no GPU hardware needed
+      backgroundThrottling: false,
       nodeIntegration:      false,
       contextIsolation:     true
     }
@@ -68,13 +69,12 @@ export function createNDIWindow () {
   ndiWindow.loadFile(rendererPath)
   ndiWindow.webContents.setFrameRate(30)
 
-  // paint fires for every rendered frame — no capturePage(), no isLoading() check
+  // paint fires when Chromium renders a frame — wired to NDI send
   ndiWindow.webContents.on('paint', (event, _dirty, image) => {
     if (!ndiSender || !ndiAvailable) return
     const { width, height } = image.getSize()
     if (width === 0 || height === 0) return
 
-    // toBitmap() → raw BGRA pixels (NDI FourCC BGRA = 0x41524742)
     const bitmap = image.toBitmap()
     try {
       ndiSender.video({
@@ -83,14 +83,14 @@ export function createNDIWindow () {
         frameRateN:         30000,
         frameRateD:         1000,
         pictureAspectRatio: width / height,
-        fourCC:             0x41524742,
-        frameFormatType:    1,        // progressive
+        fourCC:             0x41524742,  // BGRA little-endian
+        frameFormatType:    1,           // progressive
         lineStride:         width * 4,
         data:               bitmap
       })
       _frameCount++
-      if (_frameCount === 1)    console.log(`[NDI] First frame sent (${width}×${height})`)
-      if (_frameCount === 100)  console.log('[NDI] 100 frames sent — source is broadcasting')
+      if (_frameCount === 1)   console.log(`[NDI] First frame sent (${width}×${height})`)
+      if (_frameCount === 100) console.log('[NDI] 100 frames sent — source is broadcasting')
       _frameErrLogged = false
     } catch (err) {
       if (!_frameErrLogged) {
@@ -101,19 +101,22 @@ export function createNDIWindow () {
   })
 
   ndiWindow.webContents.on('did-finish-load', () => {
-    console.log('[NDI] Renderer loaded (offscreen)')
-    // With show:false, painting is paused by default — start it explicitly
-    if (typeof ndiWindow.webContents.startPainting === 'function') {
-      ndiWindow.webContents.startPainting()
-      console.log('[NDI] startPainting() called')
-    } else {
-      // Fallback: invalidate triggers a repaint
-      ndiWindow.webContents.invalidate()
-      console.log('[NDI] invalidate() called (startPainting not available)')
-    }
+    console.log('[NDI] Renderer loaded — starting paint loop')
+    // Chromium won't paint a hidden offscreen window on its own.
+    // The canonical pattern is: call invalidate() at the desired frame rate
+    // to trigger paint events. startPainting() alone is not sufficient.
+    _invalidateTimer = setInterval(() => {
+      if (ndiWindow && !ndiWindow.isDestroyed()) {
+        ndiWindow.webContents.invalidate()
+      }
+    }, Math.floor(1000 / 30))  // 30 fps
   })
 
-  ndiWindow.on('closed', () => { ndiWindow = null })
+  ndiWindow.on('closed', () => {
+    if (_invalidateTimer) { clearInterval(_invalidateTimer); _invalidateTimer = null }
+    ndiWindow = null
+  })
+
   console.log('[NDI] Renderer window created (offscreen, 30 fps)')
 }
 
@@ -145,10 +148,12 @@ export function enableNDICapture () {
 }
 
 export function disableNDICapture () {
+  if (_invalidateTimer) { clearInterval(_invalidateTimer); _invalidateTimer = null }
   if (ndiWindow && !ndiWindow.isDestroyed()) { ndiWindow.close(); ndiWindow = null }
 }
 
 export function cleanup () {
+  if (_invalidateTimer) { clearInterval(_invalidateTimer); _invalidateTimer = null }
   if (ndiWindow && !ndiWindow.isDestroyed()) {
     ndiWindow.close()
     ndiWindow = null
