@@ -102,6 +102,15 @@ export function createNDIWindow () {
 
   ndiWindow.webContents.on('did-finish-load', () => {
     console.log('[NDI] Renderer loaded (offscreen)')
+    // With show:false, painting is paused by default — start it explicitly
+    if (typeof ndiWindow.webContents.startPainting === 'function') {
+      ndiWindow.webContents.startPainting()
+      console.log('[NDI] startPainting() called')
+    } else {
+      // Fallback: invalidate triggers a repaint
+      ndiWindow.webContents.invalidate()
+      console.log('[NDI] invalidate() called (startPainting not available)')
+    }
   })
 
   ndiWindow.on('closed', () => { ndiWindow = null })
