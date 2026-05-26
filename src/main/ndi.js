@@ -22,8 +22,12 @@ export async function initNDI () {
       // eslint-disable-next-line
       grandiose = require(join(process.resourcesPath, 'resources', 'ndi', 'grandiose-loader.js'))
     } else {
+      // Dev mode: use the same pre-built grandiose.node + NDI DLL as the packaged app.
+      // This ensures the native binary and the runtime DLL are always the same version.
+      const ndiDir = join(process.cwd(), 'resources', 'ndi')
+      process.env.PATH = `${ndiDir};${process.env.PATH ?? ''}`
       // eslint-disable-next-line
-      grandiose = require('grandiose')
+      grandiose = require(join(ndiDir, 'grandiose-loader.js'))
     }
     const sender = await grandiose.send({
       name:        'StageTimer Output',
@@ -32,7 +36,8 @@ export async function initNDI () {
     })
     ndiSender    = sender
     ndiAvailable = true
-    console.log('[NDI] Sender ready — "StageTimer Output"')
+    const ver = grandiose.version ? grandiose.version() : 'unknown'
+    console.log(`[NDI] Sender ready — "StageTimer Output" (SDK version: ${ver})`)
     return true
   } catch (err) {
     console.log('[NDI] Not available:', err.message || err)
@@ -72,6 +77,9 @@ export function createNDIWindow () {
 
 // ── Per-frame capture → NDI send ─────────────────────────────────────────────
 
+let _frameCount = 0
+let _frameErrorLogged = false
+
 async function captureAndSend () {
   if (!ndiWindow || ndiWindow.isDestroyed()) return
   if (!ndiSender || !ndiAvailable)           return
@@ -97,7 +105,17 @@ async function captureAndSend () {
       lineStride:         width * 4,
       data:               bitmap
     })
-  } catch { /* swallow frame errors */ }
+
+    _frameCount++
+    if (_frameCount === 1)   console.log(`[NDI] First frame sent (${width}×${height})`)
+    if (_frameCount === 100) console.log('[NDI] 100 frames sent — source is broadcasting')
+    _frameErrorLogged = false
+  } catch (err) {
+    if (!_frameErrorLogged) {
+      console.error('[NDI] Frame send error:', err?.message || err)
+      _frameErrorLogged = true
+    }
+  }
 }
 
 // ── State push from broadcast listener ───────────────────────────────────────
