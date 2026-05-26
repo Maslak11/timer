@@ -27,6 +27,14 @@
     }).catch(() => {})
   }
 
+  // --- Initial state fetch (shows time immediately while SSE handshake completes) ---
+  function fetchState () {
+    fetch(RELAY + '/api/state.php?id=' + ROOM)
+      .then(r => r.ok ? r.json() : null)
+      .then(s => { if (s && window.onTimerState) window.onTimerState(s) })
+      .catch(() => {})
+  }
+
   // --- SSE for live updates ---
   let es = null
   let retryDelay = 2000
@@ -77,5 +85,6 @@
     }
   }
 
+  fetchState()
   connect()
 })()

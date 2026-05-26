@@ -18,7 +18,7 @@ set_time_limit(60);
 ini_set('output_buffering', 'off');
 
 $db = db();
-$lastSeq = -1;
+$lastStateJson = '';
 
 function sse($event, $data) {
     echo "event: $event\n";
@@ -36,7 +36,7 @@ if ($cid) {
 }
 
 // Send initial state
-$row = $db->prepare("SELECT state, seq FROM rooms WHERE id = ?");
+$row = $db->prepare("SELECT state FROM rooms WHERE id = ?");
 $row->execute([$id]);
 $room = $row->fetch();
 
@@ -46,7 +46,7 @@ if (!$room) {
     exit;
 }
 
-$lastSeq = (int)$room['seq'];
+$lastStateJson = $room['state'];
 sse('state', json_decode($room['state'], true));
 sse('connected', ['id' => $id]);
 
@@ -69,13 +69,13 @@ while (time() < $deadline && !connection_aborted()) {
         }
     }
 
-    // Use seq counter for change detection — immune to TIMESTAMP second-precision issues
-    $q = $db->prepare("SELECT state, seq FROM rooms WHERE id = ? AND seq > ?");
-    $q->execute([$id, $lastSeq]);
+    // Compare full state JSON — no timestamp precision issues, no schema changes needed
+    $q = $db->prepare("SELECT state FROM rooms WHERE id = ?");
+    $q->execute([$id]);
     $updated = $q->fetch();
 
-    if ($updated) {
-        $lastSeq = (int)$updated['seq'];
+    if ($updated && $updated['state'] !== $lastStateJson) {
+        $lastStateJson = $updated['state'];
         sse('state', json_decode($updated['state'], true));
     } else {
         // Keepalive
