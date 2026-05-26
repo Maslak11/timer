@@ -34,8 +34,8 @@ if (!$row || $row['secret'] !== $secret) {
     http_response_code(403); echo json_encode(['error' => 'wrong secret']); exit;
 }
 
-// Update state
-$db->prepare("UPDATE rooms SET state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$state, $id]);
+// Update state (atomically increment seq for change detection)
+$db->prepare("UPDATE rooms SET state = ?, updated_at = CURRENT_TIMESTAMP, seq = seq + 1 WHERE id = ?")->execute([$state, $id]);
 
 // Return pending commands and mark as executed
 $cmds = $db->prepare("SELECT id, command FROM commands WHERE room_id = ? AND executed = 0 ORDER BY created_at ASC LIMIT 20");

@@ -34,8 +34,14 @@ function init_tables() {
         id VARCHAR(8) PRIMARY KEY,
         secret VARCHAR(64) NOT NULL,
         state MEDIUMTEXT,
+        seq BIGINT UNSIGNED NOT NULL DEFAULT 0,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Migration: add seq column to existing tables
+    try {
+        $db->exec("ALTER TABLE rooms ADD COLUMN seq BIGINT UNSIGNED NOT NULL DEFAULT 0");
+    } catch (\Exception $e) { /* already exists */ }
 
     $db->exec("CREATE TABLE IF NOT EXISTS commands (
         id INT AUTO_INCREMENT PRIMARY KEY,

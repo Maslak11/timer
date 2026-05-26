@@ -18,7 +18,7 @@ set_time_limit(60);
 ini_set('output_buffering', 'off');
 
 $db = db();
-$lastUpdated = '';
+$lastSeq = -1;
 
 function sse($event, $data) {
     echo "event: $event\n";
@@ -36,7 +36,7 @@ if ($cid) {
 }
 
 // Send initial state
-$row = $db->prepare("SELECT state, updated_at FROM rooms WHERE id = ?");
+$row = $db->prepare("SELECT state, seq FROM rooms WHERE id = ?");
 $row->execute([$id]);
 $room = $row->fetch();
 
@@ -46,7 +46,7 @@ if (!$room) {
     exit;
 }
 
-$lastUpdated = $room['updated_at'];
+$lastSeq = (int)$room['seq'];
 sse('state', json_decode($room['state'], true));
 sse('connected', ['id' => $id]);
 
@@ -69,12 +69,13 @@ while (time() < $deadline && !connection_aborted()) {
         }
     }
 
-    $q = $db->prepare("SELECT state, updated_at FROM rooms WHERE id = ? AND updated_at > ?");
-    $q->execute([$id, $lastUpdated]);
+    // Use seq counter for change detection — immune to TIMESTAMP second-precision issues
+    $q = $db->prepare("SELECT state, seq FROM rooms WHERE id = ? AND seq > ?");
+    $q->execute([$id, $lastSeq]);
     $updated = $q->fetch();
 
     if ($updated) {
-        $lastUpdated = $updated['updated_at'];
+        $lastSeq = (int)$updated['seq'];
         sse('state', json_decode($updated['state'], true));
     } else {
         // Keepalive

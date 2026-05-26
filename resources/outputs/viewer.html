@@ -53,34 +53,65 @@ function fmt(sec) {
   if(h>0) return h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')
   return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')
 }
+
+// Live state + reference point for smooth interpolation
+let liveState = null
+let refElapsed = 0    // elapsed at the moment of last state delivery
+let refTime = 0       // Date.now() at the moment of last state delivery
+let refRunning = false
+
 function render(state) {
+  liveState = state
   const timer = state.timers[state.activeTimerIndex]
+  if (timer) {
+    refElapsed  = timer.elapsed
+    refTime     = Date.now()
+    refRunning  = timer.state === 'running'
+  }
+  // Flash / blackout are event-based, update immediately
   document.getElementById('blackout').className = state.blackout ? 'on' : ''
-  document.getElementById('flash').className = state.flash ? 'on' : ''
-  if(!timer) return
-  const remaining = timer.type==='countdown' ? timer.duration - timer.elapsed : timer.elapsed
-  const overtime = timer.type==='countdown' && timer.elapsed > timer.duration
-  const progress = timer.duration>0 ? Math.min(timer.elapsed/timer.duration,1) : 0
+  document.getElementById('flash').className    = state.flash    ? 'on' : ''
+  document.getElementById('status').textContent = 'Connected'
+}
+
+// Animation loop — runs ~60fps, uses interpolated elapsed for smooth countdown
+function tick() {
+  requestAnimationFrame(tick)
+  if (!liveState) return
+  const timer = liveState.timers[liveState.activeTimerIndex]
+  if (!timer) return
+
+  // Interpolate elapsed if timer is running
+  const elapsed = refRunning ? refElapsed + (Date.now() - refTime) / 1000 : refElapsed
+
+  const remaining = timer.type === 'countdown' ? timer.duration - elapsed : elapsed
+  const overtime  = timer.type === 'countdown' && elapsed > timer.duration
+  const progress  = timer.duration > 0 ? Math.min(elapsed / timer.duration, 1) : 0
+
   const el = document.getElementById('main-time')
   el.textContent = (overtime ? '+' : '') + fmt(Math.abs(remaining))
   el.className = overtime ? 'overtime' : ''
-  const barColor = overtime||Math.abs(remaining)<60 ? '#e53935' : Math.abs(remaining)<300 ? '#ff9800' : '#4caf50'
-  document.getElementById('progress-fill').style.width = (progress*100)+'%'
+
+  const barColor = overtime || Math.abs(remaining) < 60 ? '#e53935'
+                 : Math.abs(remaining) < 300            ? '#ff9800'
+                 : '#4caf50'
+  document.getElementById('progress-fill').style.width      = (progress * 100) + '%'
   document.getElementById('progress-fill').style.background = barColor
-  document.getElementById('label').textContent = timer.name
-  document.getElementById('live-dot').className = timer.state==='running' ? 'live' : ''
-  const msg = state.messages.find(m=>m.visible)
+  document.getElementById('label').textContent              = timer.name
+  document.getElementById('live-dot').className             = timer.state === 'running' ? 'live' : ''
+
+  const msg = liveState.messages.find(m => m.visible)
   const msgEl = document.getElementById('message')
-  if(msg) {
-    msgEl.textContent = msg.text
-    msgEl.style.color = msg.color==='white'?'#e8e8e8':msg.color
-    msgEl.style.fontWeight = msg.bold?700:400
+  if (msg) {
+    msgEl.textContent    = msg.text
+    msgEl.style.color    = msg.color === 'white' ? '#e8e8e8' : msg.color
+    msgEl.style.fontWeight = msg.bold ? 700 : 400
     msgEl.className = 'visible'
   } else {
     msgEl.className = ''
   }
-  document.getElementById('status').textContent = 'Connected'
 }
+requestAnimationFrame(tick)
 </script>
 <script src="shared/relay-client.js"></script>
 <script src="shared/socket-client.js"></script>
