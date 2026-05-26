@@ -5,6 +5,8 @@ import { app as electronApp } from 'electron'
 let ndiSender    = null
 let ndiAvailable = false
 let ndiWindow    = null
+let captureInterval  = null
+let _invalidateTimer = null
 
 // ── NDI SDK initialisation ────────────────────────────────────────────────────
 
@@ -17,12 +19,13 @@ export async function initNDI () {
       // eslint-disable-next-line
       grandiose = require(join(process.resourcesPath, 'resources', 'ndi', 'grandiose-loader.js'))
     } else {
-      // Dev mode: use the same pre-built grandiose.node + NDI DLL as the packaged app
+      // Dev: use pre-built grandiose.node from resources/ndi/ + bundled NDI DLL
       const ndiDir = join(process.cwd(), 'resources', 'ndi')
       process.env.PATH = `${ndiDir};${process.env.PATH ?? ''}`
       // eslint-disable-next-line
       grandiose = require(join(ndiDir, 'grandiose-loader.js'))
     }
+
     const sender = await grandiose.send({
       name:        'StageTimer Output',
       clockVideo:  true,
@@ -31,7 +34,24 @@ export async function initNDI () {
     ndiSender    = sender
     ndiAvailable = true
     const ver = grandiose.version ? grandiose.version() : 'unknown'
-    console.log(`[NDI] Sender ready — "StageTimer Output" (SDK version: ${ver})`)
+    console.log(`[NDI] Sender ready — "StageTimer Output" (SDK: ${ver})`)
+
+    // Diagnostic: verify our source appears in discovery after 3 s
+    setTimeout(async () => {
+      try {
+        const found = await grandiose.find({ wait: 2000 })
+        const names = (found || []).map(s => s.name || s)
+        console.log('[NDI] Sources visible via grandiose.find():', names.length ? names.join(', ') : '(none)')
+        if (names.some(n => String(n).includes('StageTimer'))) {
+          console.log('[NDI] ✓ Own source is discoverable — NDI Monitor firewall rule may be missing')
+        } else {
+          console.log('[NDI] ✗ Own source NOT found by grandiose.find() — SDK or DLL issue')
+        }
+      } catch (e) {
+        console.log('[NDI] grandiose.find() failed:', e.message)
+      }
+    }, 3000)
+
     return true
   } catch (err) {
     console.log('[NDI] Not available:', err.message || err)
@@ -40,14 +60,13 @@ export async function initNDI () {
   }
 }
 
-// ── Offscreen 1920×1080 renderer window ──────────────────────────────────────
-// offscreen: true → Electron renders to a memory buffer via paint events.
-// No GPU hardware, no disk cache, no network service — none of the issues
-// that a normal hidden BrowserWindow has on headless/restricted machines.
+// ── Hidden 1920×1080 renderer window ─────────────────────────────────────────
+// Strategy: offscreen:true avoids GPU-cache crashes. For frames, use
+// capturePage() triggered from setInterval — started only AFTER did-finish-load
+// so we never hit the isLoading() === true deadlock of the original approach.
 
-let _frameCount      = 0
-let _frameErrLogged  = false
-let _invalidateTimer = null
+let _frameCount     = 0
+let _frameErrLogged = false
 
 export function createNDIWindow () {
   ndiWindow = new BrowserWindow({
@@ -55,7 +74,7 @@ export function createNDIWindow () {
     height: 1080,
     show:   false,
     webPreferences: {
-      offscreen:            true,   // software-render to buffer, no GPU hardware needed
+      offscreen:            true,  // avoid GPU disk-cache / network-service crashes
       backgroundThrottling: false,
       nodeIntegration:      false,
       contextIsolation:     true
@@ -67,60 +86,86 @@ export function createNDIWindow () {
     : join(process.cwd(), 'resources', 'outputs', 'ndi-renderer.html')
 
   ndiWindow.loadFile(rendererPath)
-  ndiWindow.webContents.setFrameRate(30)
 
-  // paint fires when Chromium renders a frame — wired to NDI send
+  // ── paint event (offscreen) ────────────────────────────────────────────────
   ndiWindow.webContents.on('paint', (event, _dirty, image) => {
-    if (!ndiSender || !ndiAvailable) return
-    const { width, height } = image.getSize()
-    if (width === 0 || height === 0) return
-
-    const bitmap = image.toBitmap()
-    try {
-      ndiSender.video({
-        xres:               width,
-        yres:               height,
-        frameRateN:         30000,
-        frameRateD:         1000,
-        pictureAspectRatio: width / height,
-        fourCC:             0x41524742,  // BGRA little-endian
-        frameFormatType:    1,           // progressive
-        lineStride:         width * 4,
-        data:               bitmap
-      })
-      _frameCount++
-      if (_frameCount === 1)   console.log(`[NDI] First frame sent (${width}×${height})`)
-      if (_frameCount === 100) console.log('[NDI] 100 frames sent — source is broadcasting')
-      _frameErrLogged = false
-    } catch (err) {
-      if (!_frameErrLogged) {
-        console.error('[NDI] Frame send error:', err?.message || err)
-        _frameErrLogged = true
-      }
-    }
+    sendFrame(image)
   })
 
-  ndiWindow.webContents.on('did-finish-load', () => {
-    console.log('[NDI] Renderer loaded — starting paint loop')
-    // Chromium won't paint a hidden offscreen window on its own.
-    // The canonical pattern is: call invalidate() at the desired frame rate
-    // to trigger paint events. startPainting() alone is not sufficient.
+  // ── fallback: capturePage() loop — started after did-finish-load ───────────
+  // If the offscreen paint event never fires (known issue on some Windows configs),
+  // capturePage() on an offscreen window still works once the page is loaded.
+  ndiWindow.webContents.once('did-finish-load', () => {
+    console.log('[NDI] Renderer loaded')
+
+    // Try to kick offscreen paint loop
+    if (typeof ndiWindow.webContents.startPainting === 'function') {
+      ndiWindow.webContents.startPainting()
+    }
+    ndiWindow.webContents.setFrameRate(30)
+
+    // invalidate loop to drive paint events
     _invalidateTimer = setInterval(() => {
-      if (ndiWindow && !ndiWindow.isDestroyed()) {
-        ndiWindow.webContents.invalidate()
-      }
-    }, Math.floor(1000 / 30))  // 30 fps
+      if (ndiWindow && !ndiWindow.isDestroyed()) ndiWindow.webContents.invalidate()
+    }, Math.floor(1000 / 30))
+
+    // capturePage fallback — captures whatever the offscreen renderer has
+    captureInterval = setInterval(captureAndSend, Math.floor(1000 / 30))
   })
 
   ndiWindow.on('closed', () => {
-    if (_invalidateTimer) { clearInterval(_invalidateTimer); _invalidateTimer = null }
+    clearIntervals()
     ndiWindow = null
   })
 
-  console.log('[NDI] Renderer window created (offscreen, 30 fps)')
+  console.log('[NDI] Renderer window created (offscreen)')
 }
 
-// ── State push from broadcast listener ───────────────────────────────────────
+// ── Frame helpers ─────────────────────────────────────────────────────────────
+
+function sendFrame (image) {
+  if (!ndiSender || !ndiAvailable) return
+  try {
+    const { width, height } = image.getSize()
+    if (width === 0 || height === 0) return
+    ndiSender.video({
+      xres: width, yres: height,
+      frameRateN: 30000, frameRateD: 1000,
+      pictureAspectRatio: width / height,
+      fourCC: 0x41524742,  // BGRA
+      frameFormatType: 1,
+      lineStride: width * 4,
+      data: image.toBitmap()
+    })
+    _frameCount++
+    if (_frameCount === 1)   console.log(`[NDI] First frame sent (${width}×${height})`)
+    if (_frameCount === 100) console.log('[NDI] 100 frames sent — source should be visible in NDI Monitor')
+    _frameErrLogged = false
+  } catch (err) {
+    if (!_frameErrLogged) {
+      console.error('[NDI] Frame send error:', err?.message || err)
+      _frameErrLogged = true
+    }
+  }
+}
+
+let _captureBusy = false
+async function captureAndSend () {
+  if (!ndiWindow || ndiWindow.isDestroyed()) return
+  if (!ndiSender || !ndiAvailable) return
+  if (_captureBusy) return  // don't stack concurrent captures
+  if (_frameCount > 0) return  // paint event is working — capturePage not needed
+
+  _captureBusy = true
+  try {
+    const image = await ndiWindow.webContents.capturePage()
+    sendFrame(image)
+  } catch { /* swallow */ } finally {
+    _captureBusy = false
+  }
+}
+
+// ── State push ────────────────────────────────────────────────────────────────
 
 export function updateNDIState (state) {
   if (!ndiWindow || ndiWindow.isDestroyed()) return
@@ -147,17 +192,19 @@ export function enableNDICapture () {
   return true
 }
 
-export function disableNDICapture () {
+function clearIntervals () {
+  if (captureInterval)  { clearInterval(captureInterval);  captureInterval  = null }
   if (_invalidateTimer) { clearInterval(_invalidateTimer); _invalidateTimer = null }
+}
+
+export function disableNDICapture () {
+  clearIntervals()
   if (ndiWindow && !ndiWindow.isDestroyed()) { ndiWindow.close(); ndiWindow = null }
 }
 
 export function cleanup () {
-  if (_invalidateTimer) { clearInterval(_invalidateTimer); _invalidateTimer = null }
-  if (ndiWindow && !ndiWindow.isDestroyed()) {
-    ndiWindow.close()
-    ndiWindow = null
-  }
+  clearIntervals()
+  if (ndiWindow && !ndiWindow.isDestroyed()) { ndiWindow.close(); ndiWindow = null }
   if (ndiSender) {
     try { ndiSender.destroy() } catch {}
     ndiSender = null
