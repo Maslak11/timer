@@ -6,7 +6,6 @@ let ndiSender    = null
 let ndiAvailable = false
 let ndiWindow    = null
 let captureInterval  = null
-let _invalidateTimer = null
 
 // ── NDI SDK initialisation ────────────────────────────────────────────────────
 
@@ -35,23 +34,6 @@ export async function initNDI () {
     ndiAvailable = true
     const ver = grandiose.version ? grandiose.version() : 'unknown'
     console.log(`[NDI] Sender ready — "StageTimer Output" (SDK: ${ver})`)
-
-    // Diagnostic: verify our source appears in discovery after 3 s
-    setTimeout(async () => {
-      try {
-        const found = await grandiose.find({ wait: 2000 })
-        const names = (found || []).map(s => s.name || s)
-        console.log('[NDI] Sources visible via grandiose.find():', names.length ? names.join(', ') : '(none)')
-        if (names.some(n => String(n).includes('StageTimer'))) {
-          console.log('[NDI] ✓ Own source is discoverable — NDI Monitor firewall rule may be missing')
-        } else {
-          console.log('[NDI] ✗ Own source NOT found by grandiose.find() — SDK or DLL issue')
-        }
-      } catch (e) {
-        console.log('[NDI] grandiose.find() failed:', e.message)
-      }
-    }, 3000)
-
     return true
   } catch (err) {
     console.log('[NDI] Not available:', err.message || err)
@@ -60,21 +42,29 @@ export async function initNDI () {
   }
 }
 
-// ── Hidden 1920×1080 renderer window ─────────────────────────────────────────
-// Strategy: offscreen:true avoids GPU-cache crashes. For frames, use
-// capturePage() triggered from setInterval — started only AFTER did-finish-load
-// so we never hit the isLoading() === true deadlock of the original approach.
+// ── Hidden renderer window ────────────────────────────────────────────────────
+// Strategy: create a real (non-offscreen) BrowserWindow, show it with opacity 0
+// so it is invisible to the user but Chromium allocates a real GPU surface and
+// paints it normally.  capturePage() reads from Chromium's internal buffer —
+// it is NOT affected by window opacity — so we get proper 1920×1080 frames.
+//
+// Why NOT offscreen:true — With offscreen + show:false, Chromium never
+// allocates a GPU surface.  paint events only fire on visible DOM mutations,
+// and capturePage() returns a 0×0 empty NativeImage (silently dropped).
 
 let _frameCount     = 0
 let _frameErrLogged = false
 
 export function createNDIWindow () {
   ndiWindow = new BrowserWindow({
-    width:  1920,
-    height: 1080,
-    show:   false,
+    width:       1920,
+    height:      1080,
+    show:        false,
+    frame:       false,
+    skipTaskbar: true,
+    focusable:   false,
+    transparent: true,   // required for setOpacity(0) to work cleanly
     webPreferences: {
-      offscreen:            true,  // avoid GPU disk-cache / network-service crashes
       backgroundThrottling: false,
       nodeIntegration:      false,
       contextIsolation:     true
@@ -87,38 +77,23 @@ export function createNDIWindow () {
 
   ndiWindow.loadFile(rendererPath)
 
-  // ── paint event (offscreen) ────────────────────────────────────────────────
-  ndiWindow.webContents.on('paint', (event, _dirty, image) => {
-    sendFrame(image)
-  })
-
-  // ── fallback: capturePage() loop — started after did-finish-load ───────────
-  // If the offscreen paint event never fires (known issue on some Windows configs),
-  // capturePage() on an offscreen window still works once the page is loaded.
   ndiWindow.webContents.once('did-finish-load', () => {
-    console.log('[NDI] Renderer loaded')
+    // Show the window invisibly — this causes Chromium to allocate a GPU
+    // compositing surface and start painting, which capturePage() needs.
+    ndiWindow.showInactive()
+    ndiWindow.setOpacity(0)
 
-    // Try to kick offscreen paint loop
-    if (typeof ndiWindow.webContents.startPainting === 'function') {
-      ndiWindow.webContents.startPainting()
-    }
-    ndiWindow.webContents.setFrameRate(30)
-
-    // invalidate loop to drive paint events
-    _invalidateTimer = setInterval(() => {
-      if (ndiWindow && !ndiWindow.isDestroyed()) ndiWindow.webContents.invalidate()
-    }, Math.floor(1000 / 30))
-
-    // capturePage fallback — captures whatever the offscreen renderer has
+    // Start 30 fps capture loop
     captureInterval = setInterval(captureAndSend, Math.floor(1000 / 30))
+    console.log('[NDI] Renderer loaded — capture loop started (opacity-0 window)')
   })
 
   ndiWindow.on('closed', () => {
-    clearIntervals()
+    clearCapture()
     ndiWindow = null
   })
 
-  console.log('[NDI] Renderer window created (offscreen)')
+  console.log('[NDI] Renderer window created')
 }
 
 // ── Frame helpers ─────────────────────────────────────────────────────────────
@@ -153,9 +128,7 @@ let _captureBusy = false
 async function captureAndSend () {
   if (!ndiWindow || ndiWindow.isDestroyed()) return
   if (!ndiSender || !ndiAvailable) return
-  if (_captureBusy) return  // don't stack concurrent captures
-  if (_frameCount > 0) return  // paint event is working — capturePage not needed
-
+  if (_captureBusy) return
   _captureBusy = true
   try {
     const image = await ndiWindow.webContents.capturePage()
@@ -192,18 +165,17 @@ export function enableNDICapture () {
   return true
 }
 
-function clearIntervals () {
-  if (captureInterval)  { clearInterval(captureInterval);  captureInterval  = null }
-  if (_invalidateTimer) { clearInterval(_invalidateTimer); _invalidateTimer = null }
+function clearCapture () {
+  if (captureInterval) { clearInterval(captureInterval); captureInterval = null }
 }
 
 export function disableNDICapture () {
-  clearIntervals()
+  clearCapture()
   if (ndiWindow && !ndiWindow.isDestroyed()) { ndiWindow.close(); ndiWindow = null }
 }
 
 export function cleanup () {
-  clearIntervals()
+  clearCapture()
   if (ndiWindow && !ndiWindow.isDestroyed()) { ndiWindow.close(); ndiWindow = null }
   if (ndiSender) {
     try { ndiSender.destroy() } catch {}
