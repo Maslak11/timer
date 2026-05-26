@@ -69,7 +69,8 @@
           ]
         }
       ],
-      "icon": "resources/icons/icon.ico"
+      "icon": "resources/icons/icon.ico",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
